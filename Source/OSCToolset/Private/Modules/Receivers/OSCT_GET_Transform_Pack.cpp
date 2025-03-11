@@ -8,6 +8,7 @@ UOSCT_GET_Transform_Pack::UOSCT_GET_Transform_Pack()
 {
 	//Defaults for the receiver
 	ModuleType = EOSCT_Module_Type::TRANSFORM;
+	componentLength = 9;
 	SetDebugColor();
 
 	isPack = true;
@@ -15,15 +16,14 @@ UOSCT_GET_Transform_Pack::UOSCT_GET_Transform_Pack()
 
 void UOSCT_GET_Transform_Pack::GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
 {
-	const int32 compLength = 9;
-	int32 length = GetMessagePackLength(InMessage, compLength);
+	int32 length = GetMessagePackLength(InMessage);
 
 	TMap < FString, FTransform > TransformMap;
 
 	//Compile the message values to a packed array.
 	for (int i = 0; i < length; i++)
 	{
-		int index = (i * (compLength + 1));
+		int index = (i * (componentLength + 1)) + 1;
 		//UE_LOG(OSCToolset, Error, TEXT("CompLength: %d"), compLength);
 		FString key = "";
 		UOSCManager::GetString(InMessage, index, key);

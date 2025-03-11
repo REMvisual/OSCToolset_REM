@@ -8,6 +8,7 @@ UOSCT_GET_Color_Pack::UOSCT_GET_Color_Pack()
 {
 	//Defaults for the receiver
 	ModuleType = EOSCT_Module_Type::COLOR;
+	componentLength = 4;
 	SetDebugColor();
 
 	isPack = true;
@@ -15,16 +16,14 @@ UOSCT_GET_Color_Pack::UOSCT_GET_Color_Pack()
 
 void UOSCT_GET_Color_Pack::GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
 {
-	const int32 compLength = 4;
-	int32 length = GetMessagePackLength(InMessage, compLength);
+	int32 length = GetMessagePackLength(InMessage);
 
 	TMap < FString, FLinearColor > ColorMap;
 
 	//Compile the message values to a packed array.
 	for (int i = 0; i < length; i++)
 	{
-		int index = (i * (compLength + 1));
-		//UE_LOG(OSCToolset, Error, TEXT("CompLength: %d"), compLength);
+		int index = (i * (componentLength + 1)) + 1;
 		FString key = "";
 		UOSCManager::GetString(InMessage, index, key);
 

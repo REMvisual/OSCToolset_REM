@@ -33,6 +33,8 @@ public:
 	virtual void GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort);
 
 protected:
+	int32 componentLength;			   // Sets the length of the module component. 
+
 	//Check for incoming messages timer
 	bool bUpdated;                     // Tracks whether messages are being received
 	FTimerHandle MessageTimeoutHandle; // Timer handle to manage the cooldown timer
@@ -51,7 +53,7 @@ protected:
 	// Function to be called when the timer runs out
 	void OnMessageTimeout();
 
-	int32 GetMessagePackLength(const FOSCMessage& InMessage, const int32 ComponentLength);
+	int32 GetMessagePackLength(const FOSCMessage& InMessage);
 
 	UFUNCTION()
 	void filter_OSC_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort);

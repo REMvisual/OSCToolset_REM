@@ -10,6 +10,7 @@ UOSCT_GET_Event_Pack::UOSCT_GET_Event_Pack()
 
 	//Defaults for the receiver
 	ModuleType = EOSCT_Module_Type::EVENT;
+	componentLength = 1;
 	SetDebugColor();
 
 	isPack = true;
@@ -17,21 +18,20 @@ UOSCT_GET_Event_Pack::UOSCT_GET_Event_Pack()
 
 void UOSCT_GET_Event_Pack::GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
 {
-	const int32 compLength = 1;
-	int32 length = GetMessagePackLength(InMessage, compLength);
+	int32 length = GetMessagePackLength(InMessage);
 
 	TMap < FString, bool > EventMap;
 
 	//Compile the message values to a packed array.
 	for (int i = 0; i < length; i++)
 	{
-		int index = (i) * 2;
+		int index = (i + 1) * 2;
 
 		FString key = "";
 		bool val = false;
 
-		UOSCManager::GetString(InMessage, index, key);		// Pair (even) index, sequence of 0-2-4-6-...
-		UOSCManager::GetBool(InMessage, index+1, val);		// Odd index is i + 1 1-3-5--9,...7
+		UOSCManager::GetString(InMessage, index-1, key);		// Pair (even) index, sequence of 0-2-4-6-...
+		UOSCManager::GetBool(InMessage, index, val);		// Odd index is i + 1 1-3-5--9,...7
 
 		EventMap.Add(key, val);
 	}

@@ -10,6 +10,7 @@ UOSCT_GET_String_Pack::UOSCT_GET_String_Pack()
 
 	//Defaults for the receiver
 	ModuleType = EOSCT_Module_Type::STRING;
+	componentLength = 0; // The string pack doesn't have keys as it brings in an array, then we would have 2 times less strings.
 	SetDebugColor();
 	DebugDuration = 2.0f;
 
@@ -18,27 +19,16 @@ UOSCT_GET_String_Pack::UOSCT_GET_String_Pack()
 
 void UOSCT_GET_String_Pack::GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
 {
-	const int32 compLength = 0;
-	int32 length = GetMessagePackLength(InMessage, compLength) * 1; // The string pack doesn't have keys as it brings in an array, then we would have 2 times less strings.
-	
+
 	TArray <FString> StringArray;
-	StringArray.SetNum(length);
-	//Compile the message values to a packed array.
-	for (int i = 0; i < length; i++)
-	{
+	UOSCManager::GetAllStrings(InMessage, StringArray);
 
-		FString key = "";
-
-		UOSCManager::GetString(InMessage, i, key);	// Odd index is i + 1 1-3-5-7-9,...
-
-		StringArray[i] = key;
-	}
 
 	Pack = StringArray;
 	Get_String_Pack.Broadcast(Pack);
 
 	// DEBUG //
-	FString Slength = FString::FromInt(length);
+	FString Slength = FString::FromInt(StringArray.Num());
 
 	OSCTDebugOSCMessage(Slength);
 

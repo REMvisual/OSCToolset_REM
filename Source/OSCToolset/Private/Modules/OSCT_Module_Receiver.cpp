@@ -70,13 +70,16 @@ void UOSCT_Module_Receiver::OnMessageTimeout()
 	bUpdated = false;
 }
 
-int32 UOSCT_Module_Receiver::GetMessagePackLength(const FOSCMessage& InMessage, const int32 ComponentLength)
+int32 UOSCT_Module_Receiver::GetMessagePackLength(const FOSCMessage& InMessage)
 {
 	//The component length is how many parts each component has, for example a VEC3 is 3 Components.
 	//ComponentLength+1 is each element of the pack (KEY+Values)
 	//The pack structure expects a string / key before the list of components, so that is why we divide by ComponentLength+1
 	//InMessage Argument Length / (ComponentLength+1)
-	return InMessage.GetArgumentsChecked().Num() / (ComponentLength+1);
+	int32 length = 0;
+	UOSCManager::GetInt32(InMessage, 0, length);
+	return length;
+	//return InMessage.GetArgumentsChecked().Num() / (ComponentLength+1);
 }
 
 void UOSCT_Module_Receiver::filter_OSC_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort) {

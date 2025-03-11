@@ -8,6 +8,7 @@ UOSCT_GET_Vector3_Pack::UOSCT_GET_Vector3_Pack()
 {
 	//Defaults for the receiver
 	ModuleType = EOSCT_Module_Type::VEC3;
+	componentLength = 3;
 	SetDebugColor();
 
 	isPack = true;
@@ -15,15 +16,14 @@ UOSCT_GET_Vector3_Pack::UOSCT_GET_Vector3_Pack()
 
 void UOSCT_GET_Vector3_Pack::GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
 {
-	const int32 compLength = 3;
-	int32 length = GetMessagePackLength(InMessage, compLength);
+	int32 length = GetMessagePackLength(InMessage);
 
 	TMap < FString, FVector > Vec3Map;
 
 	//Compile the message values to a packed array.
 	for (int i = 0; i < length; i++)
 	{
-		int index = (i * (compLength + 1));
+		int index = (i * (componentLength + 1)) + 1;
 
 		FString key = "";
 		UOSCManager::GetString(InMessage, index, key);
