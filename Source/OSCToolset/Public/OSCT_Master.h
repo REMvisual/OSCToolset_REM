@@ -49,6 +49,10 @@ public:
 	
 	void ToggleOSCTMenu();
 
+protected:
+	// Event handler for the level change
+	void OnLevelChanged(const FString& LevelName);
+
 private:
 
 	UPROPERTY()
@@ -62,11 +66,13 @@ private:
 
 	void reinit_OSCT_Master();
 
-	FString OSCT_Base_addr = "/osctoolset_";
+	FString OSCT_Base_addr = "/OSCT/";
 
 	FString OSCT_Init_addr = OSCT_Base_addr + "init";
 
 	FString OSCT_Shutdown_addr = OSCT_Base_addr + "shutdown";
+
+	FString OSCT_OnLevelChanged_addr = OSCT_Base_addr + "level_changed";
 
 	void InitializeOSC();
 

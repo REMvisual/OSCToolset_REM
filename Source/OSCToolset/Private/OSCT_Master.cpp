@@ -16,6 +16,7 @@
 #include "Engine/World.h" // Required for UWorld
 #include "Engine/Engine.h" //Required for GEngine
 #include "Engine/GameViewportClient.h" // Required for GameViewport
+#include "CoreMinimal.h"
 
 #include "GameFramework/PlayerController.h" // Required for APlayerController
 
@@ -30,6 +31,8 @@ void UOSCT_Master::Initialize(FSubsystemCollectionBase& Collection)
     IPV4 = GetLocalIPAddress();
 
     init_OSCT_Master();
+
+    FCoreUObjectDelegates::PreLoadMap.AddUObject(this, &UOSCT_Master::OnLevelChanged);
 }
 
 void UOSCT_Master::init_OSCT_Master()
@@ -67,6 +70,12 @@ void UOSCT_Master::InitializeOSC()
         OnInitOSCT.Broadcast();
         UE_LOG(OSCToolset, Log, TEXT("Initialize OSC from OSCT_Master"));
     }
+}
+
+void UOSCT_Master::OnLevelChanged(const FString& LevelName)
+{
+    UE_LOG(OSCToolset, Log, TEXT("About to load level: %s"), *LevelName);
+    SendOSCTBaseMessage(OSCT_OnLevelChanged_addr);
 }
 
 void UOSCT_Master::SendOSCTBaseMessage(FString Message)
@@ -204,7 +213,9 @@ void UOSCT_Master::Deinitialize()
 {
     Super::Deinitialize();
     // Clean up any resources here
-     
+
+    FCoreUObjectDelegates::PreLoadMap.Clear(); //Cleanup On Level Loaded Static Delegate.
+
     shutdown_OSCT_Master();
 }
 
