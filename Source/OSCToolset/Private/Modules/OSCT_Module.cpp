@@ -141,6 +141,12 @@ void UOSCT_Module::BeginPlay()
 	}
 }
 
+void UOSCT_Module::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+	UE_LOG(OSCToolset, Log, TEXT("OSCTModule EndPlay >> NAME:%s"), *OSCTMName);
+}
+
 void UOSCT_Module::init_OSCT_Module()
 {
 	is_address_valid(Address); //Check if the address is valid
@@ -219,7 +225,7 @@ void UOSCT_Module::FormatOSCTAddress()
 void UOSCT_Module::SendConnectedOSCTModule()
 {
 	FOSCMessage msg;
-	FString m_send_addr = "/osctoolset_module_connected";
+	FString m_send_addr = "/OSCT/module_connected";
 
 	//Name
 	FString m_name = "Name%";
@@ -238,11 +244,9 @@ void UOSCT_Module::SendConnectedOSCTModule()
 	FString m_addr = "Address%" + Address;
 	UOSCManager::AddString(msg, m_addr);
 
-
 	//Formatted Addr
 	FString m_faddr = "Formatted Address%" + FormattedAddress;
 	UOSCManager::AddString(msg, m_faddr);
-
 
 	//Role type
 	FString m_bt = "Role Type%" + UEnum::GetDisplayValueAsText(RoleType).ToString().ToUpper();

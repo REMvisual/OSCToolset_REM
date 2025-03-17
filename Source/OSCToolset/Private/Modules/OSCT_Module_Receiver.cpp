@@ -45,13 +45,30 @@ void UOSCT_Module_Receiver::shutdown_OSCT_Module()
 
 void UOSCT_Module_Receiver::ResetMessageTimer()
 {
+	// Ensure the receiver is valid
+	if (!IsValid(this))
+	{
+		UE_LOG(OSCToolset, Error, TEXT("UOSCT_Module_Receiver::ResetMessageTimer() was called on an invalid object!"));
+		return;
+	}
+
 	// Reset the "bUpdated" flag to indicate that messages are being received
 	bUpdated = true;
 
-	// Clear any existing timer to avoid overlapping timers
-	if (GetWorld()->GetTimerManager().IsTimerActive(MessageTimeoutHandle))
+	// Ensure the world is valid before using the timer manager
+	UWorld* World = GetWorld();
+	if (!World)
 	{
-		GetWorld()->GetTimerManager().ClearTimer(MessageTimeoutHandle);
+		UE_LOG(OSCToolset, Error, TEXT("ResetMessageTimer() called, but GetWorld() returned nullptr!"));
+		return;
+	}
+
+	FTimerManager& TimerManager = World->GetTimerManager();
+
+	// Clear any existing timer to avoid overlapping timers
+	if (TimerManager.IsTimerActive(MessageTimeoutHandle))
+	{
+		TimerManager.ClearTimer(MessageTimeoutHandle);
 	}
 
 	// Set a new timer. If this time expires, it means no messages were received during this period.
