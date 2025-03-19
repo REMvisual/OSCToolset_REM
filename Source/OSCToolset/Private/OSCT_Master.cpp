@@ -74,7 +74,7 @@ void UOSCT_Master::InitializeOSC()
 
 void UOSCT_Master::OnLevelChanged(const FString& LevelName)
 {
-    UE_LOG(OSCToolset, Log, TEXT("About to load level: %s"), *LevelName);
+    UE_LOG(OSCToolset, Log, TEXT("OnLevelChanged: %s"), *LevelName);
     SendOSCTBaseMessage(OSCT_OnLevelChanged_addr);
 }
 
@@ -139,12 +139,11 @@ void UOSCT_Master::SetCommands(const FOSCMessage& InMessage, const FString& InAd
 {
     APlayerController* PC = GetWorld()->GetFirstPlayerController();
 
-    FString maxfps = "/osctoolset_maxfps";
+    FString cmd_addr = OSCT_Base_addr + "R/CMD";
 
     FString msg = UOSCManager::GetOSCAddressFullPath(UOSCManager::GetOSCMessageAddress(InMessage));
 
-
-    if (UKismetStringLibrary::EqualEqual_StrStr(maxfps, msg))
+    if (UKismetStringLibrary::EqualEqual_StrStr(cmd_addr, msg))
     {
         //Once we checked if the Module Formatted address equals exactly to the incoming address, we can call GET_Message.
         if (PC)
@@ -211,45 +210,47 @@ void UOSCT_Master::ToggleOSCTMenu()
 
 void UOSCT_Master::Deinitialize()
 {
+    shutdown_OSCT_Master();
+
     Super::Deinitialize();
     // Clean up any resources here
 
-    FCoreUObjectDelegates::PreLoadMap.Clear(); //Cleanup On Level Loaded Static Delegate.
+    FCoreUObjectDelegates::PreLoadMap.RemoveAll(this); //Cleanup On Level Loaded Static Delegate.
 
-    shutdown_OSCT_Master();
 }
 
 void UOSCT_Master::shutdown_OSCT_Master()
 {
     OnShutdownOSCT.Broadcast();
-    // Clean up any resources here
-    if (OSCT_Client != nullptr)
+
+    if (IsValid(OSCT_Client))
     {
         FOSCAddress addr = UOSCManager::ConvertStringToOSCAddress(OSCT_Shutdown_addr);
-        FOSCMessage msg;
-        msg = UOSCManager::SetOSCMessageAddress(msg, addr);
-
-        if (addr.GetFullPath().IsEmpty()) {
-            UE_LOG(OSCToolset, Error, TEXT("Invalid OSC Address created from message: %s"), *OSCT_Shutdown_addr);
+        if (addr.GetFullPath().IsEmpty())
+        {
+            UE_LOG(OSCToolset, Error, TEXT("Invalid OSC Address: %s"), *OSCT_Shutdown_addr);
             return;
         }
 
-        OSCT_Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
-        OSCT_Client = nullptr; // Safeguard to prevent reuse of an invalid pointer
+        FOSCMessage msg;
+        msg = UOSCManager::SetOSCMessageAddress(msg, addr);
+
+        OSCT_Client->SendOSCMessage(msg);
+        OSCT_Client->ConditionalBeginDestroy(); // Proper cleanup
+        OSCT_Client = nullptr;
     }
     else
     {
-        UE_LOG(OSCToolset, Error, TEXT("OSCT Can't be Shutdown, Settings might not exist or the Client is null."));
+        UE_LOG(OSCToolset, Error, TEXT("OSCT_Client is already invalid."));
     }
-    if (OSCT_Server != nullptr) 
+
+    if (IsValid(OSCT_Server))
     {
+        OSCT_Server->ConditionalBeginDestroy();
         OSCT_Server = nullptr;
     }
+
     UE_LOG(OSCToolset, Log, TEXT("OSCT_MasterSubsystem Deinitialized"));
-
-    // Force garbage collection at the end of deinitialization
-    CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
-
 }
 
 void UOSCT_Master::reinit_OSCT_Master()
