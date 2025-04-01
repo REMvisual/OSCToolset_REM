@@ -25,6 +25,7 @@ enum class EOSCT_Module_Type : uint8
 	TRANSFORM	UMETA(DisplayName = "Transform"),	
 	STRING		UMETA(DisplayName = "String"),
 	ROTATION	UMETA(DisplayName = "Rotation"),
+	MIDI		UMETA(DisplayName = "MIDI"),
 
 };
 

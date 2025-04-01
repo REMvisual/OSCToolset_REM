@@ -83,6 +83,9 @@ void UOSCT_Module::SetDebugColor()
 	case EOSCT_Module_Type::ROTATION:
 		DebugColor = FColor(127, 140, 255);
 		break;
+	case EOSCT_Module_Type::MIDI:
+		DebugColor = FColor(80, 80, 255);
+		break;
 	}
 }
 

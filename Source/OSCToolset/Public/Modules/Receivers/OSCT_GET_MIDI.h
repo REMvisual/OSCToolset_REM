@@ -18,11 +18,25 @@ struct FOSCTMidi
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "OSCToolset")
 	int32 Velocity;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "OSCToolset")
+	int32 Voices;
 };
 
-UCLASS()
+//Delegates
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGetMIDI, FString, Address, const FOSCTMidi, MIDI);
+
+UCLASS(meta = (BlueprintSpawnableComponent))
 class OSCTOOLSET_API UOSCT_GET_MIDI : public UOSCT_Module_Receiver
 {
 	GENERATED_BODY()
-	
+
+public:
+	UOSCT_GET_MIDI();
+
+	FOSCTMidi Value;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnGetMIDI Get_MIDI;
+
+	virtual void GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort) override;
 };
