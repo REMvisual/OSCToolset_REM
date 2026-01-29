@@ -48,7 +48,6 @@ public:
 	virtual void Deinitialize() override;
 	
 	void ToggleOSCTMenu();
-
 protected:
 	// Event handler for the level change
 	void OnLevelChanged(const FString& LevelName);
