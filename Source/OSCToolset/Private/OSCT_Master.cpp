@@ -22,6 +22,23 @@
 
 #include "Kismet/KismetStringLibrary.h"
 
+void UOSCT_Master::RegisterListener(FString Address, UObject* Listener)
+{
+    if (Listener && Listener->Implements<UOSCT_Listener>())
+    {
+        AddressMap.FindOrAdd(Address).AddUnique(Listener);
+        UE_LOG(OSCToolset, Log, TEXT("Registered a new Listener:%s"), *Address);
+    }
+}
+
+void UOSCT_Master::UnregisterListener(FString Address, UObject* Listener)
+{
+    if (AddressMap.Contains(Address))
+    {
+        AddressMap[Address].Remove(Listener);
+    }
+}
+
 void UOSCT_Master::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
@@ -63,6 +80,7 @@ void UOSCT_Master::InitializeOSC()
     {
         SendOSCTBaseMessage(OSCT_Init_addr);
         UE_LOG(OSCToolset, Log, TEXT("Send OSCT Master Init message"));
+        OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::RouteMessage);
         OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::SetCommands);
     }
     if (OSCT_Client != nullptr)
@@ -154,7 +172,6 @@ void UOSCT_Master::SetCommands(const FOSCMessage& InMessage, const FString& InAd
             PC->ConsoleCommand(cmd, true);
         }
     }
-
 }
 
 void UOSCT_Master::LogSettings()
@@ -259,4 +276,30 @@ void UOSCT_Master::reinit_OSCT_Master()
 
     shutdown_OSCT_Master(); //First shutdown and clear
     init_OSCT_Master(); //Then init the OSCT Master again
+}
+
+void UOSCT_Master::RouteMessage(const FOSCMessage& Message, const FString& IPAddress, int32 Port)
+{
+    // 1. Get the Address from the message
+    FString IncomingAddr = UOSCManager::GetOSCAddressFullPath(UOSCManager::GetOSCMessageAddress(Message));
+    
+    UE_LOG(OSCToolset, Log, TEXT("Route message: %s"), *IPAddress);
+    
+    // 2. Look up who is listening to this exact address
+    if (AddressMap.Contains(IncomingAddr))
+    {
+        TArray<UObject*> Listeners = AddressMap[IncomingAddr];
+        
+        for (UObject* Listener : Listeners)
+        {
+            if (IsValid(Listener))
+            {
+                // Route to the Raw Message event in the Interface
+                IOSCT_Listener::Execute_OnOSCMessageReceived(Listener, IncomingAddr, Message);
+                
+                // Optional: You could also parse types here and call 
+                // Execute_OnOSCFloatReceived if the message contains a float.
+            }
+        }
+    }
 }

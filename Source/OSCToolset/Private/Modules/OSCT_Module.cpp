@@ -137,6 +137,7 @@ void UOSCT_Module::BeginPlay()
 	{
 		OSCT_Master->OnInitOSCT.AddDynamic(this, &UOSCT_Module::init_OSCT_Module); //Used to init the module if we call the Re-Initialize OSCT.
 		OSCT_Master->OnShutdownOSCT.AddDynamic(this, &UOSCT_Module::shutdown_OSCT_Module); //Used to shutdown the module if we call the Re-Initialize OSCT.
+		// OSCT_Master->RegisterListener(FormattedAddress, this); //Register to the master.
 		init_OSCT_Module(); //This is only once at Begin Play. 
 	}
 	else {
@@ -146,6 +147,11 @@ void UOSCT_Module::BeginPlay()
 
 void UOSCT_Module::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// if (OSCT_Master)
+	// {
+	// 	//Unregister if the endplay is called, makes sure there are no dead objects on master.	
+	// 	OSCT_Master->UnregisterListener(FormattedAddress, this);
+	// }
 	Super::EndPlay(EndPlayReason);
 	UE_LOG(OSCToolset, Log, TEXT("OSCTModule EndPlay >> NAME:%s"), *OSCTMName);
 }
@@ -157,8 +163,8 @@ void UOSCT_Module::init_OSCT_Module()
 
 	//This function is called once the Game Mode has created the Server and the Client
 	//Previously I used a timer to check the validity of the Game Mode, now this seems to be much faster.
-	Server = OSCT_Master->OSCT_Server;
-	Client = OSCT_Master->OSCT_Client;
+	OSCT_Server = OSCT_Master->OSCT_Server;
+	OSCT_Client = OSCT_Master->OSCT_Client;
 
 	FString BoolAsString = FString::Printf(TEXT("%s"), PrimaryComponentTick.bCanEverTick ? TEXT("True") : TEXT("False"));
 	UE_LOG(OSCToolset, Log, TEXT(">>OSCTModule initialized<< NAME:%s // CLASS:%s // Owner:%s // CanTick:%s // Address:%s // FormattedAddress:%s"), *OSCTMName, *OSCTMClass, *OSCTMOwner, *BoolAsString, *Address, *FormattedAddress);
@@ -264,7 +270,7 @@ void UOSCT_Module::SendConnectedOSCTModule()
 	UOSCManager::AddString(msg, m_pack);
 
 	FOSCAddress m_osc_addr = UOSCManager::ConvertStringToOSCAddress(m_send_addr);
-	Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, m_osc_addr));
+	OSCT_Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, m_osc_addr));
 }
 
 // Called every frame

@@ -28,7 +28,7 @@ void UOSCT_SEND_Float::OSCT_Send_Float(const FString Name, const float Value, bo
 
 	if (Address != "")
 	{
-		Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
+		OSCT_Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
 		OSCTDebugOSCMessage(FString::Printf(TEXT("/%s - %.2f"),*Name, Value));
 	}
 }

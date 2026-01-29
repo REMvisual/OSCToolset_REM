@@ -25,9 +25,9 @@ void UOSCT_SEND_String::OSCT_Send_String(const FString Name, const FString Value
 	FOSCMessage msg;
 	UOSCManager::AddString(msg, Value);
 	
-	if (Client)
+	if (OSCT_Client)
 	{
-		Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
+		OSCT_Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
 		OSCTDebugOSCMessage(FString::Printf(TEXT("/%s - %s"), *Name, *Value));
 	}
 }

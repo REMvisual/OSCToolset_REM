@@ -8,7 +8,11 @@
 #include "OSCServer.h"
 #include "OSCClient.h"
 
+#include "Interfaces/OSCT_Listener.h"
+
 #include "OSCT_Settings.h"
+#include "OSCT_ETypes.h"
+
 #include "UI/SOSCT_Menu.h"
 
 #include "OSCT_Master.generated.h"
@@ -31,6 +35,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "OSCToolset")
 	UOSCClient* OSCT_Client;
 
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset")
+	void RegisterListener(FString Address, UObject* Listener);
+
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset")
+	void UnregisterListener(FString Address, UObject* Listener);
+	
 	// Delegate for the Init OSC.
 	UPROPERTY()
 	FOnOSCTInit OnInitOSCT;
@@ -64,7 +74,15 @@ private:
 	void shutdown_OSCT_Master();
 
 	void reinit_OSCT_Master();
+	
+	// Maps an OSC Address to a list of Objects that implement IOSCT_Listener
+    TMap<FString, TArray<UObject*>> AddressMap;
 
+    // The function bound to OSCT_Server->OnOscMessageReceived
+    UFUNCTION()
+    void RouteMessage(const FOSCMessage& Message, const FString& IPAddress, int32 Port);
+	
+	
 	FString OSCT_Base_addr = "/OSCT/";
 
 	FString OSCT_Init_addr = OSCT_Base_addr + "init";

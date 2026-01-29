@@ -28,9 +28,9 @@ void UOSCT_SEND_Event::OSCT_Send_Event(const FString Name, bool& bSuccess)
 	FOSCMessage msg;
 	UOSCManager::AddFloat(msg, gameTime);
 
-	if (Client) 
+	if (OSCT_Client) 
 	{
-		Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
+		OSCT_Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
 		OSCTDebugOSCMessage(Name);
 	}
 }

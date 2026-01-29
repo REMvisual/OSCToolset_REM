@@ -37,6 +37,28 @@ enum class EOSCT_Sender_Type : uint8
 	STRING	UMETA(DisplayName = "String"),
 };
 
+USTRUCT(BlueprintType)
+struct FOSCT_Module_Receiver_Info
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
+	FString Address;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
+	EOSCT_Module_Type ModuleType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", 
+		meta = (EditCondition = "ModuleType != EOSCT_Module_Type::EVENT && ModuleType != EOSCT_Module_Type::MIDI", EditConditionHides))
+	bool EnableTick;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", 
+		meta = (EditCondition = "ModuleType != EOSCT_Module_Type::EVENT && ModuleType != EOSCT_Module_Type::MIDI", EditConditionHides))
+	float InterpolationSpeed;
+
+};
+
+
 class OSCTOOLSET_API OSCT_ETypes
 {
 public:

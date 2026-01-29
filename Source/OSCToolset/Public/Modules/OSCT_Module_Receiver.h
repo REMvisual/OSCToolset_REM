@@ -10,7 +10,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOSCMessageFiltered, const FOSCMessage&, Message, const FString&, IPAddress, int32, Port);
 
 UCLASS(Abstract)
-class OSCTOOLSET_API UOSCT_Module_Receiver : public UOSCT_Module
+class OSCTOOLSET_API UOSCT_Module_Receiver : public UOSCT_Module, public IOSCT_Listener
 {
 	GENERATED_BODY()
 
@@ -31,7 +31,10 @@ public:
 
 	UFUNCTION()
 	virtual void GET_Message(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort);
-
+	
+	//New interface message handling
+	virtual void OnOSCMessageReceived_Implementation(const FString& Address, const FOSCMessage& Message) override;
+	
 protected:
 	int32 componentLength;			   // Sets the length of the module component. 
 

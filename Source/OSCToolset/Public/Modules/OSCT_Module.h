@@ -59,10 +59,10 @@ public:
 	UOSCT_Master* OSCT_Master;
 
 	UPROPERTY()
-	UOSCServer* Server;
+	UOSCServer* OSCT_Server;
 
 	UPROPERTY()
-	UOSCClient* Client;
+	UOSCClient* OSCT_Client;
 
 
 	// DEBUG //

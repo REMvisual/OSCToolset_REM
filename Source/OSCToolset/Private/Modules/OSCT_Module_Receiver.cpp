@@ -32,14 +32,18 @@ void UOSCT_Module_Receiver::BeginPlay()
 void UOSCT_Module_Receiver::init_OSCT_Module()
 {
 	Super::init_OSCT_Module();
+	if (OSCT_Master)
+	{
+		OSCT_Master->RegisterListener(Address, this);
+	}
 	////Binds the GET_Message Event to the OnOSCMessageReceived of the OSC Plugin.
-	Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Module_Receiver::filter_OSC_Message);
-	this->OnMessageFiltered.AddDynamic(this, &UOSCT_Module_Receiver::GET_Message);
+	// OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Module_Receiver::filter_OSC_Message);
+	// this->OnMessageFiltered.AddDynamic(this, &UOSCT_Module_Receiver::GET_Message);
 }
 
 void UOSCT_Module_Receiver::shutdown_OSCT_Module()
 {
-	Server->OnOscMessageReceived.RemoveAll(this);
+	OSCT_Server->OnOscMessageReceived.RemoveAll(this);
 	this->OnMessageFiltered.RemoveAll(this);
 }
 
@@ -122,4 +126,9 @@ void UOSCT_Module_Receiver::GET_Message(const FOSCMessage& InMessage, const FStr
 		firstMessage = false;
 	}
 	ResetMessageTimer();
+}
+
+void UOSCT_Module_Receiver::OnOSCMessageReceived_Implementation(const FString& InAddress, const FOSCMessage& InMessage)
+{
+	GET_Message(InMessage, InAddress, 0);
 }
