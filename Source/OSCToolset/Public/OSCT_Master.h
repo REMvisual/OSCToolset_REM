@@ -4,11 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Tickable.h"
 
 #include "OSCServer.h"
 #include "OSCClient.h"
-
-#include "Interfaces/OSCT_Listener.h"
 
 #include "OSCT_Settings.h"
 #include "OSCT_ETypes.h"
@@ -17,29 +16,50 @@
 
 #include "OSCT_Master.generated.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(OSCToolset, Log, All);
+// DECLARE_LOG_CATEGORY_EXTERN(OSCToolset, Log, All);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOSCTInit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOSCTShutdown);
 
 UCLASS()
-class OSCTOOLSET_API UOSCT_Master : public UGameInstanceSubsystem
+class OSCTOOLSET_API UOSCT_Master : public UGameInstanceSubsystem, public FTickableGameObject
 {
 	GENERATED_BODY()
 
-public:
+protected:
+	virtual void Tick(float DeltaTime) override;
+	virtual bool IsTickable() const override { return !IsTemplate(); }
+	virtual TStatId GetStatId() const override { RETURN_QUICK_DECLARE_CYCLE_STAT(UOSCT_Master, STATGROUP_Tickables); }
 
+public:
+	
 	UPROPERTY(BlueprintReadOnly, Category="OSCToolset")
 	UOSCServer* OSCT_Server;
 
 	UPROPERTY(BlueprintReadOnly, Category = "OSCToolset")
 	UOSCClient* OSCT_Client;
 
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	void AddModule(FOSCT_Module Module, UObject* Owner);
+	
+	// UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	// void AddReceiver(FOSCT_Receiver Receiver, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	void AddManyModules(TArray<FOSCT_Module> Modules, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset", 
+		meta = (
+			RequiredAssetDataTag = "RowStructure=/Script/OSCToolset.FOSCT_Receiver",
+			DefaultToSelf = "Owner", 
+			HidePin = "Owner"))
+	void AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	void RemoveModule(const FOSCT_Module Module, UObject* Owner);
+	
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset")
-	void RegisterListener(FString Address, UObject* Listener);
-
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset")
-	void UnregisterListener(FString Address, UObject* Listener);
+	void RemoveAllReceivers();
 	
 	// Delegate for the Init OSC.
 	UPROPERTY()
@@ -75,13 +95,17 @@ private:
 
 	void reinit_OSCT_Master();
 	
-	// Maps an OSC Address to a list of Objects that implement IOSCT_Listener
-    TMap<FString, TArray<UObject*>> AddressMap;
+	// Maps an OSC Address to a list of Objects that implement IOSCT_Router
+	// FNames faster for lookups compared to FStrings for keys.
+    TMap<FName, TArray<FOSCT_ReceiverLink>> ReceiverMap;
+    TMap<FName, TArray<FOSCT_SenderLink>> SenderMap;
 
     // The function bound to OSCT_Server->OnOscMessageReceived
     UFUNCTION()
-    void RouteMessage(const FOSCMessage& Message, const FString& IPAddress, int32 Port);
+    void RouteMessage(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort);
 	
+	UFUNCTION()
+	static bool CheckIfSettled(const FOSCT_ReceiverLink& Link);
 	
 	FString OSCT_Base_addr = "/OSCT/";
 
