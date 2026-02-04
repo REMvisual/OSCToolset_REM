@@ -7,7 +7,7 @@
 UOSCT_GET_Vector2_Pack::UOSCT_GET_Vector2_Pack()
 {
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::VEC2;
+	ModuleType = EOSCT_ModuleType::VEC2;
 	componentLength = 2;
 	SetDebugColor();
 

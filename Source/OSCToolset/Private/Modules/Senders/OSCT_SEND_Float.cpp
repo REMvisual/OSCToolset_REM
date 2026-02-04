@@ -7,7 +7,7 @@
 UOSCT_SEND_Float::UOSCT_SEND_Float()
 {
 	SenderType = EOSCT_Sender_Type::FLOAT;
-	ModuleType = EOSCT_Module_Type::FLOAT;
+	ModuleType = EOSCT_ModuleType::FLOAT;
 	SetDebugColor();
 }
 

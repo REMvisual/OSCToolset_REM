@@ -1,6 +1,6 @@
 // Copyright (c) 2024, Studio Eusebi Jucgla. All rights reserved 
 // MD5: 2245b93ed1bae2e4aff277e6f3ecb8ff
-#include "Modules/OSCT_Module.h"
+#include "Modules/OSCT_ModuleComponent.h"
 
 #include "Engine/Engine.h" // Include GEngine
 #include "Engine/GameInstance.h"
@@ -9,7 +9,9 @@
 #include "OSCAddress.h"
 
 #include "OSCT_Master.h"
-	
+#include "OSCToolsetLog.h"
+
+
 #include <Kismet/GameplayStatics.h>
 #include "Kismet/KismetStringLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -17,7 +19,7 @@
 DEFINE_LOG_CATEGORY(OSCToolset);
 
 // Sets default values for this component's properties
-UOSCT_Module::UOSCT_Module()
+UOSCT_ModuleComponent::UOSCT_ModuleComponent()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
@@ -44,7 +46,7 @@ UOSCT_Module::UOSCT_Module()
 
 }
 
-void UOSCT_Module::OSCTModuleError(const FString Message)
+void UOSCT_ModuleComponent::OSCTModuleError(const FString Message)
 {
 	FString error_msg = OSCTModuleDebugString + " " + Message;
 	// Optionally, print a warning to the screen for debugging purposes
@@ -55,41 +57,41 @@ void UOSCT_Module::OSCTModuleError(const FString Message)
 	UE_LOG(OSCToolset, Error, TEXT("%s"), *error_msg);
 }
 
-void UOSCT_Module::SetDebugColor()
+void UOSCT_ModuleComponent::SetDebugColor()
 {
 	switch (ModuleType)
 	{
-	case EOSCT_Module_Type::EVENT:
+	case EOSCT_ModuleType::EVENT:
 		DebugColor = FColor(255, 0, 100);
 		break;
-	case EOSCT_Module_Type::FLOAT:
+	case EOSCT_ModuleType::FLOAT:
 		DebugColor = FColor(80, 255, 0);
 		break;
-	case EOSCT_Module_Type::VEC2:
+	case EOSCT_ModuleType::VEC2:
 		DebugColor = FColor(0, 200, 255);
 		break;
-	case EOSCT_Module_Type::VEC3:
+	case EOSCT_ModuleType::VEC3:
 		DebugColor = FColor(230, 200, 0);
 		break;
-	case EOSCT_Module_Type::COLOR:
+	case EOSCT_ModuleType::COLOR:
 		DebugColor = FColor(0, 50, 255);
 		break;
-	case EOSCT_Module_Type::TRANSFORM:
+	case EOSCT_ModuleType::TRANSFORM:
 		DebugColor = FColor(255, 127, 0);
 		break;
-	case EOSCT_Module_Type::STRING:
+	case EOSCT_ModuleType::STRING:
 		DebugColor = FColor(230, 76, 255);
 		break;
-	case EOSCT_Module_Type::ROTATION:
+	case EOSCT_ModuleType::ROTATION:
 		DebugColor = FColor(127, 140, 255);
 		break;
-	case EOSCT_Module_Type::MIDI:
+	case EOSCT_ModuleType::NOTE:
 		DebugColor = FColor(80, 80, 255);
 		break;
 	}
 }
 
-bool UOSCT_Module::is_address_valid(const FString InAddress)
+bool UOSCT_ModuleComponent::is_address_valid(const FString InAddress)
 {
 	// Initialize success as true
 	bool bSuccess = true;
@@ -116,7 +118,7 @@ bool UOSCT_Module::is_address_valid(const FString InAddress)
 }
 
 // Called when the game starts
-void UOSCT_Module::BeginPlay()
+void UOSCT_ModuleComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -135,9 +137,9 @@ void UOSCT_Module::BeginPlay()
 
 	if (OSCT_Master)
 	{
-		OSCT_Master->OnInitOSCT.AddDynamic(this, &UOSCT_Module::init_OSCT_Module); //Used to init the module if we call the Re-Initialize OSCT.
-		OSCT_Master->OnShutdownOSCT.AddDynamic(this, &UOSCT_Module::shutdown_OSCT_Module); //Used to shutdown the module if we call the Re-Initialize OSCT.
-		// OSCT_Master->RegisterListener(FormattedAddress, this); //Register to the master.
+		OSCT_Master->OnInitOSCT.AddDynamic(this, &UOSCT_ModuleComponent::init_OSCT_Module); //Used to init the module if we call the Re-Initialize OSCT.
+		OSCT_Master->OnShutdownOSCT.AddDynamic(this, &UOSCT_ModuleComponent::shutdown_OSCT_Module); //Used to shutdown the module if we call the Re-Initialize OSCT.
+		// OSCT_Master->AddReceiver(FormattedAddress, this); //Register to the master.
 		init_OSCT_Module(); //This is only once at Begin Play. 
 	}
 	else {
@@ -145,18 +147,18 @@ void UOSCT_Module::BeginPlay()
 	}
 }
 
-void UOSCT_Module::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UOSCT_ModuleComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	// if (OSCT_Master)
 	// {
 	// 	//Unregister if the endplay is called, makes sure there are no dead objects on master.	
-	// 	OSCT_Master->UnregisterListener(FormattedAddress, this);
+	// 	OSCT_Master->RemoveModule(FormattedAddress, this);
 	// }
 	Super::EndPlay(EndPlayReason);
 	UE_LOG(OSCToolset, Log, TEXT("OSCTModule EndPlay >> NAME:%s"), *OSCTMName);
 }
 
-void UOSCT_Module::init_OSCT_Module()
+void UOSCT_ModuleComponent::init_OSCT_Module()
 {
 	is_address_valid(Address); //Check if the address is valid
 	Settings = OSCT_Master->Settings; //Set settings for the Module. 
@@ -170,13 +172,13 @@ void UOSCT_Module::init_OSCT_Module()
 	UE_LOG(OSCToolset, Log, TEXT(">>OSCTModule initialized<< NAME:%s // CLASS:%s // Owner:%s // CanTick:%s // Address:%s // FormattedAddress:%s"), *OSCTMName, *OSCTMClass, *OSCTMOwner, *BoolAsString, *Address, *FormattedAddress);
 
 	//Send the string when an OSC Module is initialized, this is parsed in the Receriver to debug the connected modules.
-	SendConnectedOSCTModule();
+	// SendConnectedOSCTModule();
 
 	if (DebugAddress)
 	{
 		OSCTDebugOSCMessage(""); // To debug the address on Begin Play of the OSCT Module
 	}
-	if (RoleType == EOSCT_Role_Type::SENDER)
+	if (RoleType == EOSCT_Role::SENDER)
 	{
 		//Call the Init Module Delegate for senders.
 		On_Init_OSCT_Module.Broadcast();
@@ -185,13 +187,13 @@ void UOSCT_Module::init_OSCT_Module()
 	}
 }
 
-void UOSCT_Module::shutdown_OSCT_Module()
+void UOSCT_ModuleComponent::shutdown_OSCT_Module()
 {
 	//Add some logic to reset the variables?
 	//This is needed for OSCT_Module_Receiver, to unbind the Delegates of Sending and Filtering messages. 
 }
 
-void UOSCT_Module::OSCTDebugOSCMessage(const FString MessageValues)
+void UOSCT_ModuleComponent::OSCTDebugOSCMessage(const FString MessageValues)
 { 
 	if (Debug)
 	{
@@ -212,7 +214,7 @@ void UOSCT_Module::OSCTDebugOSCMessage(const FString MessageValues)
 	}
 }
 
-void UOSCT_Module::FormatOSCTAddress()
+void UOSCT_ModuleComponent::FormatOSCTAddress()
 {
 	//This function takes certain properties of the module to create the final address. Like the Source, the Address, the OP Name, the Type, etc. 
 	//FString source = UKismetStringLibrary::ToUpper(UKismetStringLibrary::GetSubstring(UEnum::GetDisplayValueAsText(SourceType).ToString()));
@@ -231,7 +233,7 @@ void UOSCT_Module::FormatOSCTAddress()
 	}
 }
 
-void UOSCT_Module::SendConnectedOSCTModule()
+void UOSCT_ModuleComponent::SendConnectedOSCTModule()
 {
 	FOSCMessage msg;
 	FString m_send_addr = "/OSCT/module_connected";
@@ -274,7 +276,7 @@ void UOSCT_Module::SendConnectedOSCTModule()
 }
 
 // Called every frame
-void UOSCT_Module::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UOSCT_ModuleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
@@ -283,7 +285,7 @@ void UOSCT_Module::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 
 
 template<typename TEnum>
-FString UOSCT_Module::GetEnumValueAsString(TEnum InEnum)
+FString UOSCT_ModuleComponent::GetEnumValueAsString(TEnum InEnum)
 {
 	FString e_str = UEnum::GetValueAsString(InEnum);
 	FString l_str;

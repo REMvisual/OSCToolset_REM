@@ -14,20 +14,20 @@
 
 #include "OSCT_Master.h"
 
-#include "OSCT_Module.generated.h"
+#include "OSCT_ModuleComponent.generated.h"
 
 
 //Delegates
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInitOSCTModule);
 
 UCLASS(Abstract)
-class OSCTOOLSET_API UOSCT_Module : public UActorComponent
+class OSCTOOLSET_API UOSCT_ModuleComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:	
 	// Sets default values for this component's properties
-	UOSCT_Module();
+	UOSCT_ModuleComponent();
 
 	// Delegates //
 	UPROPERTY(BlueprintAssignable)
@@ -41,10 +41,10 @@ public:
 	bool isPack;
 
 	UPROPERTY()
-	EOSCT_Role_Type RoleType;
+	EOSCT_Role RoleType;
 
 	UPROPERTY()
-	EOSCT_Module_Type ModuleType;
+	EOSCT_ModuleType ModuleType;
 
 	UPROPERTY()
 	EOSCT_Sender_Type SenderType;

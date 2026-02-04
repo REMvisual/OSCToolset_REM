@@ -7,7 +7,7 @@
 UOSCT_GET_Rotation::UOSCT_GET_Rotation()
 {
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::ROTATION;
+	ModuleType = EOSCT_ModuleType::ROTATION;
 	SetDebugColor();
 }
 

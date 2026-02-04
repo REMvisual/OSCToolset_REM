@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Modules/OSCT_Module.h"
+#include "Modules/OSCT_ModuleComponent.h"
 #include "OSCT_Module_Sender.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class OSCTOOLSET_API UOSCT_Module_Sender : public UOSCT_Module
+class OSCTOOLSET_API UOSCT_Module_Sender : public UOSCT_ModuleComponent
 {
 	GENERATED_BODY()
 

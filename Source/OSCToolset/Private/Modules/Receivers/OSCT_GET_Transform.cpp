@@ -11,7 +11,7 @@
 UOSCT_GET_Transform::UOSCT_GET_Transform()
 {
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::TRANSFORM;
+	ModuleType = EOSCT_ModuleType::TRANSFORM;
 	SetDebugColor();
 }
 

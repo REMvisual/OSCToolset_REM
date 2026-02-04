@@ -8,7 +8,7 @@
 UOSCT_SEND_Event::UOSCT_SEND_Event()
 {
 	SenderType = EOSCT_Sender_Type::EVENT;
-	ModuleType = EOSCT_Module_Type::EVENT;
+	ModuleType = EOSCT_ModuleType::EVENT;
 	SetDebugColor();
 }
 

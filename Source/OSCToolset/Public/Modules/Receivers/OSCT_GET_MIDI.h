@@ -13,13 +13,13 @@ struct FOSCTMidi
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "OSCToolset")
-	int32 Pitch;
+	int32 Pitch = 0;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "OSCToolset")
-	int32 Velocity;
+	int32 Velocity = 0;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "OSCToolset")
-	int32 Voices;
+	int32 Voices = 1;
 };
 
 //Delegates

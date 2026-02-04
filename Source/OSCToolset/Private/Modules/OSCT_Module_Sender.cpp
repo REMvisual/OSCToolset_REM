@@ -9,7 +9,7 @@
 
 UOSCT_Module_Sender::UOSCT_Module_Sender()
 {
-	RoleType = EOSCT_Role_Type::SENDER;
+	RoleType = EOSCT_Role::SENDER;
 
 }
 

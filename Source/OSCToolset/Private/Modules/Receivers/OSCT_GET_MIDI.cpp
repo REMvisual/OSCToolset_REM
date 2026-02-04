@@ -9,7 +9,7 @@
 UOSCT_GET_MIDI::UOSCT_GET_MIDI()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	ModuleType = EOSCT_Module_Type::MIDI;
+	ModuleType = EOSCT_ModuleType::NOTE;
 	SetDebugColor();
 	DebugDuration = 2.0f;
 }

@@ -9,7 +9,7 @@ UOSCT_GET_Event_Pack::UOSCT_GET_Event_Pack()
 	PrimaryComponentTick.bCanEverTick = false;
 
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::EVENT;
+	ModuleType = EOSCT_ModuleType::EVENT;
 	componentLength = 1;
 	SetDebugColor();
 

@@ -3,14 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Modules/OSCT_Module.h"
+#include "Modules/OSCT_ModuleComponent.h"
+#include "Interfaces/OSCT_Router.h"
+
 #include "OSCT_Module_Receiver.generated.h"
 
 // Delegates
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOSCMessageFiltered, const FOSCMessage&, Message, const FString&, IPAddress, int32, Port);
 
 UCLASS(Abstract)
-class OSCTOOLSET_API UOSCT_Module_Receiver : public UOSCT_Module, public IOSCT_Listener
+class OSCTOOLSET_API UOSCT_Module_Receiver : public UOSCT_ModuleComponent, public IOSCT_Router
 {
 	GENERATED_BODY()
 
@@ -20,12 +22,20 @@ public:
 	UPROPERTY()
 	bool firstMessage = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", meta = (EditCondition = "ModuleType == EOSCT_Module_Type::FLOAT || ModuleType == EOSCT_Module_Type::VEC2 || ModuleType == EOSCT_Module_Type::VEC3 || ModuleType == EOSCT_Module_Type::COLOR || ModuleType == EOSCT_Module_Type::TRANSFORM || ModuleType == EOSCT_Module_Type::ROTATION", EditConditionHides))
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", meta = (EditCondition = "ModuleType == EOSCT_ModuleType::FLOAT || ModuleType == EOSCT_ModuleType::VEC2 || ModuleType == EOSCT_ModuleType::VEC3 || ModuleType == EOSCT_ModuleType::COLOR || ModuleType == EOSCT_ModuleType::TRANSFORM || ModuleType == EOSCT_ModuleType::ROTATION", EditConditionHides))
+	// bool EnableTick;
+	//
+	// UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", meta = (EditCondition = "ModuleType == EOSCT_ModuleType::FLOAT || ModuleType == EOSCT_ModuleType::VEC2 || ModuleType == EOSCT_ModuleType::VEC3 || ModuleType == EOSCT_ModuleType::COLOR || ModuleType == EOSCT_ModuleType::TRANSFORM || ModuleType == EOSCT_ModuleType::ROTATION", EditConditionHides))
+	// float InterpolationSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", 
+		meta = (EditCondition = "ModuleType != EOSCT_ModuleType::EVENT && ModuleType != EOSCT_ModuleType::NOTE", EditConditionHides))
 	bool EnableTick;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", meta = (EditCondition = "ModuleType == EOSCT_Module_Type::FLOAT || ModuleType == EOSCT_Module_Type::VEC2 || ModuleType == EOSCT_Module_Type::VEC3 || ModuleType == EOSCT_Module_Type::COLOR || ModuleType == EOSCT_Module_Type::TRANSFORM || ModuleType == EOSCT_Module_Type::ROTATION", EditConditionHides))
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick", 
+		meta = (EditCondition = "ModuleType != EOSCT_ModuleType::EVENT && ModuleType != EOSCT_ModuleType::NOTE", EditConditionHides))
 	float InterpolationSpeed;
-
+	
 	UPROPERTY()
 	FOSCMessageFiltered OnMessageFiltered;
 

@@ -9,7 +9,7 @@ UOSCT_GET_String_Pack::UOSCT_GET_String_Pack()
 	PrimaryComponentTick.bCanEverTick = false;
 
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::STRING;
+	ModuleType = EOSCT_ModuleType::STRING;
 	componentLength = 0; // The string pack doesn't have keys as it brings in an array, then we would have 2 times less strings.
 	SetDebugColor();
 	DebugDuration = 2.0f;

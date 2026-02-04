@@ -8,7 +8,7 @@
 UOSCT_GET_Float::UOSCT_GET_Float()
 {
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::FLOAT;
+	ModuleType = EOSCT_ModuleType::FLOAT;
 	SetDebugColor();
 }
 

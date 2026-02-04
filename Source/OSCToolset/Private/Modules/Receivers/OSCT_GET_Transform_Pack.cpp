@@ -7,7 +7,7 @@
 UOSCT_GET_Transform_Pack::UOSCT_GET_Transform_Pack()
 {
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::TRANSFORM;
+	ModuleType = EOSCT_ModuleType::TRANSFORM;
 	componentLength = 9;
 	SetDebugColor();
 

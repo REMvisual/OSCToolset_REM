@@ -8,7 +8,7 @@
 UOSCT_GET_Color::UOSCT_GET_Color()
 {
 	//Defaults for the receiver
-	ModuleType = EOSCT_Module_Type::COLOR;
+	ModuleType = EOSCT_ModuleType::COLOR;
 	SetDebugColor();
 }
 

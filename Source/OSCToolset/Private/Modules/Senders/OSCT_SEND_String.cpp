@@ -7,7 +7,7 @@
 UOSCT_SEND_String::UOSCT_SEND_String()
 {
 	SenderType = EOSCT_Sender_Type::STRING;
-	ModuleType = EOSCT_Module_Type::STRING;
+	ModuleType = EOSCT_ModuleType::STRING;
 	SetDebugColor();
 }
 

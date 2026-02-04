@@ -6,6 +6,7 @@
 #include "TimerManager.h"
 
 #include "OSCManager.h"
+#include "OSCToolsetLog.h"
 
 #include "Engine/World.h"
 
@@ -16,7 +17,7 @@ UOSCT_Module_Receiver::UOSCT_Module_Receiver()
 	PrimaryComponentTick.bCanEverTick = true;
 
 	InterpolationSpeed = 5.0f;
-	RoleType = EOSCT_Role_Type::RECEIVER;
+	RoleType = EOSCT_Role::RECEIVER;
 
 	MessageTimeoutDuration = 0.03f; //Around 30 frames per second
 	bUpdated = true;
@@ -34,7 +35,10 @@ void UOSCT_Module_Receiver::init_OSCT_Module()
 	Super::init_OSCT_Module();
 	if (OSCT_Master)
 	{
-		OSCT_Master->RegisterListener(Address, this);
+		// FOSCT_Receiver Receiver;
+		// Receiver.Address = Address;
+		// Receiver.ModuleType = ModuleType;
+		// OSCT_Master->AddReceiver(Receiver, this);
 	}
 	////Binds the GET_Message Event to the OnOSCMessageReceived of the OSC Plugin.
 	// OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Module_Receiver::filter_OSC_Message);
