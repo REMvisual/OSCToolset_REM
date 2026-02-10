@@ -74,7 +74,8 @@ struct FOSCT_ReceiverLink
 	
 	UPROPERTY()
 	FOSCT_Receiver Data;
-
+	
+	float Tolerance = 0.001f;
 	bool bNeedsInterpolation = false;
 	bool bInitialized = false;
 	
@@ -85,283 +86,180 @@ struct FOSCT_ReceiverLink
 	{
 		return GetOwner() == Other.GetOwner() && Data.Address == Other.Data.Address;
 	}
-
-};
-
-USTRUCT()
-struct FOSCT_IndexList
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	TArray<int32> Indices;
 };
 
 
-
-////////////// Receiver Types
-////////////// Receiver Types
-////////////// Receiver Types
-
-/// EVENT
-/// EVENT
-/// EVENT
-USTRUCT()
-struct FOSCT_EventLink: public FOSCT_ReceiverLink
+//Interpolation declarations
+// For float
+static void Interp(float& Cur, const float& Target, float DeltaTime, float Speed) {
+	Cur = FMath::FInterpTo(Cur, Target, DeltaTime, Speed);
+}
+// For 2D Vector
+static void Interp(FVector2D& Cur, const FVector2D& Target, float DeltaTime, float Speed) {
+	Cur = FMath::Vector2DInterpTo(Cur, Target, DeltaTime, Speed);
+}
+// For FVector
+static void Interp(FVector& Cur, const FVector& Target, float DeltaTime, float Speed) {
+	Cur = FMath::VInterpTo(Cur, Target, DeltaTime, Speed);
+}
+// For FRotator
+static void Interp(FRotator& Cur, const FRotator& Target, float DeltaTime, float Speed) {
+	Cur = FMath::RInterpTo(Cur, Target, DeltaTime, Speed);
+}
+// For FLinearColor
+static void Interp(FLinearColor& Cur, const FLinearColor& Target, float DeltaTime, float Speed)
 {
-	GENERATED_BODY()
+	Cur = FMath::CInterpTo(Cur, Target, DeltaTime, Speed);
+}
+// For FTransform
+static void Interp(FTransform& Cur, const FTransform& Target, float DeltaTime, float Speed) {
+	FVector NewLoc = FMath::VInterpTo(Cur.GetLocation(), Target.GetLocation(), DeltaTime, Speed);
+	FQuat NewRot = FQuat::Slerp(Cur.GetRotation(), Target.GetRotation(), DeltaTime * Speed);
+	FVector NewScale = FMath::VInterpTo(Cur.GetScale3D(), Target.GetScale3D(), DeltaTime, Speed);
+	Cur.SetLocation(NewLoc);
+	Cur.SetRotation(NewRot);
+	Cur.SetScale3D(NewScale);
+}
 
-	UPROPERTY()
-	bool CurrentValue = false;
-	UPROPERTY()
-	bool TargetValue = false;
-	
-	void Interpolate(float DeltaTime){};
-};
-USTRUCT()
-struct FOSCT_EventPackLink: public FOSCT_ReceiverLink
+//Equality functions
+template<typename T>
+static auto IsNearlyEqual(const T& A, const T& B, float Tolerance) -> decltype(A.Equals(B), bool()) {
+	return A.Equals(B, Tolerance);
+}
+// Specific override for floats (since they don't have .Equals)
+static bool IsNearlyEqual(float A, float B, float Tolerance) {
+	return FMath::IsNearlyEqual(A, B, Tolerance);
+}
+
+template<typename T>
+struct TOSCT_LinkBase
 {
-	GENERATED_BODY()
-
-	UPROPERTY()
-	TMap < FString, bool > CurrentValue;
-	UPROPERTY()
-	TMap < FString, bool > TargetValue;
-	
-	void Interpolate(float DeltaTime){};
-};
-
-/// FLOAT
-/// FLOAT
-/// FLOAT
-USTRUCT()
-struct FOSCT_FloatLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = float;
-	
-	UPROPERTY()
-	float CurrentValue = 0.0f;
-	UPROPERTY()
-	float TargetValue = 0.0f;
-
-	void Interpolate(float DeltaTime)
-	{
-		CurrentValue = FMath::FInterpTo(CurrentValue, TargetValue, DeltaTime, Data.Tick.InterpolationSpeed);
-	};
-	
-	bool IsSettled() const {
-		return FMath::IsNearlyEqual(CurrentValue, TargetValue, 0.001f);
-	}
-	
-};
-USTRUCT()
-struct FOSCT_FloatPackLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = TMap < FString, float >;
-	
-	UPROPERTY()
-	TMap < FString, float > CurrentValue;
-	UPROPERTY()
-	TMap < FString, float > TargetValue;
+	T CurrentValue;
+	T TargetValue;
 	
 	bool bIsCurrentlySettled = true;
-	
-	void Interpolate(float DeltaTime)
+
+	bool IsSettled(float Tolerance) const
 	{
-		// Start by assuming we are settled
+		return IsNearlyEqual(TargetValue, CurrentValue, Tolerance);
+	}
+
+	// Every child using this template will have this exact logic
+	void Interpolate(float DeltaTime, float Speed, float Tolerance)
+	{
+		Interp(CurrentValue, TargetValue, DeltaTime, Speed);
+	}
+};
+
+template<typename T>
+struct TOSCT_PackLinkBase
+{
+	TMap<FString, T> CurrentValue;
+	TMap<FString, T> TargetValue;
+	bool bIsCurrentlySettled = true;
+
+	bool IsSettled(float Tolerance) const { return bIsCurrentlySettled; }
+
+	void Interpolate(float DeltaTime, float Speed, float Tolerance)
+	{
 		bIsCurrentlySettled = true;
-		
 		for (auto& Pair : TargetValue)
 		{
-			float& Cur = CurrentValue.FindOrAdd(Pair.Key);
-            
-			// If we aren't at the target yet...
-			if (!FMath::IsNearlyEqual(Cur, Pair.Value, 0.001f))
+			T& Cur = CurrentValue.FindOrAdd(Pair.Key);
+			if (!IsNearlyEqual(Cur, Pair.Value, Tolerance))
 			{
-				Cur = FMath::FInterpTo(Cur, Pair.Value, DeltaTime, Data.Tick.InterpolationSpeed);
+				Interp(Cur, Pair.Value, DeltaTime, Speed);
 				bIsCurrentlySettled = false;
 			}
 		}
 	}
-	bool IsSettled() const 
-	{
-		return bIsCurrentlySettled;
-	}
+};
+
+
+////////////// Receiver Types
+
+/// EVENT
+USTRUCT()
+struct FOSCT_EventLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<bool>
+#endif
+{
+	GENERATED_BODY()
+};
+
+/// FLOAT
+USTRUCT()
+struct FOSCT_FloatLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<float>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = float;
 
 };
 
-/// VECTOR2
-/// VECTOR2
+
 /// VECTOR2
 USTRUCT()
 struct FOSCT_Vector2Link: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<FVector2D>
+#endif
 {
 	GENERATED_BODY()
 	using ValueType = FVector2D;
-	
-	UPROPERTY()
-	FVector2D CurrentValue = FVector2D::ZeroVector;
-	UPROPERTY()
-	FVector2D TargetValue = FVector2D::ZeroVector;
-	
-	void Interpolate(float DeltaTime)
-	{
-		CurrentValue = FMath::Vector2DInterpTo(CurrentValue, TargetValue, DeltaTime, Data.Tick.InterpolationSpeed);
-	}
-	bool IsSettled() const {
-		return CurrentValue.Equals(TargetValue, 0.01f);
-	}
-
-};
-USTRUCT()
-struct FOSCT_Vector2PackLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = TMap < FString, FVector2D >;
-	
-	UPROPERTY()
-	TMap < FString, FVector2D > CurrentValue;
-	UPROPERTY()
-	TMap < FString, FVector2D > TargetValue;
 };
 
-/// VECTOR3
-/// VECTOR3
+
 /// VECTOR3
 USTRUCT()
 struct FOSCT_Vector3Link: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<FVector>
+#endif
 {
 	GENERATED_BODY()
 	using ValueType = FVector;
-	
-	UPROPERTY()
-	FVector CurrentValue = FVector::ZeroVector;
-	UPROPERTY()
-	FVector TargetValue = FVector::ZeroVector;
-	
-	void Interpolate(float DeltaTime)
-	{
-		CurrentValue = FMath::VInterpTo(CurrentValue, TargetValue, DeltaTime, Data.Tick.InterpolationSpeed);
-	}
-	bool IsSettled() const {
-		return CurrentValue.Equals(TargetValue, 0.001f);
-	}
-};
-USTRUCT()
-struct FOSCT_Vector3PackLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = TMap < FString, FVector >;
-	
-	UPROPERTY()
-	TMap < FString, FVector > CurrentValue;
-	UPROPERTY()
-	TMap < FString, FVector > TargetValue;
 };
 
-/// ROTATION
-/// ROTATION
 /// ROTATION
 USTRUCT()
 struct FOSCT_RotationLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<FRotator>
+#endif
 {
 	GENERATED_BODY()
 	using ValueType = FRotator;
-	
-	UPROPERTY()
-	FRotator CurrentValue = FRotator::ZeroRotator;
-	UPROPERTY()
-	FRotator TargetValue = FRotator::ZeroRotator;
-
-	void Interpolate(float DeltaTime)
-	{
-		CurrentValue = FMath::RInterpTo(CurrentValue, TargetValue, DeltaTime, Data.Tick.InterpolationSpeed);
-	}
-	bool IsSettled() const {
-		return CurrentValue.Equals(TargetValue, 0.01f);
-	}
-};
-USTRUCT()
-struct FOSCT_RotationPackLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = TMap < FString, FRotator >;
-	
-	UPROPERTY()
-	TMap < FString, FRotator > CurrentValue;
-	UPROPERTY()
-	TMap < FString, FRotator > TargetValue;
 };
 
-/// COLOR
-/// COLOR
+
 /// COLOR
 USTRUCT()
 struct FOSCT_ColorLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<FLinearColor>
+#endif
 {
 	GENERATED_BODY()
 	using ValueType = FLinearColor;
-	
-	UPROPERTY()
-	FLinearColor CurrentValue = FLinearColor::White;
-	UPROPERTY()
-	FLinearColor TargetValue = FLinearColor::White;
-};
-USTRUCT()
-struct FOSCT_ColorPackLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = TMap < FString, FLinearColor > ;
-	
-	UPROPERTY()
-	TMap < FString, FLinearColor > CurrentValue;
-	UPROPERTY()
-	TMap < FString, FLinearColor > TargetValue;
 };
 
-/// TRANSFORM
-/// TRANSFORM
+
 /// TRANSFORM
 USTRUCT()
 struct FOSCT_TransformLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<FTransform>
+#endif
 {
 	GENERATED_BODY()
 	using ValueType = FTransform;
-	
-	UPROPERTY()
-	FTransform CurrentValue = FTransform::Identity;
-	UPROPERTY()
-	FTransform TargetValue = FTransform::Identity;
-	//
-	// void Interpolate(float DeltaTime) {
-	// 	float Speed = Data.Tick.InterpolationSpeed;
-	// 	CurrentLocation = FMath::VInterpTo(CurrentLocation, TargetLocation, DeltaTime, Data.Tick.InterpolationSpeed);
-	// 	CurrentRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, Data.Tick.InterpolationSpeed);
-	// 	CurrentScale = FMath::VInterpTo(CurrentScale, TargetScale, DeltaTime, Data.Tick.InterpolationSpeed);
-	// }
-	//
-	// bool IsSettled() const {
-	// 	return CurrentLocation.Equals(TargetLocation, 0.001f) &&
-	// 		   CurrentRotation.Equals(TargetRotation, 0.01f) &&
-	// 		   CurrentScale.Equals(TargetScale, 0.001f);
-	// }
-};
-USTRUCT()
-struct FOSCT_TransformPackLink: public FOSCT_ReceiverLink
-{
-	GENERATED_BODY()
-	using ValueType = TMap < FString, FTransform >;
-	
-	UPROPERTY()
-	TMap < FString, FTransform > CurrentValue;
-	UPROPERTY()
-	TMap < FString, FTransform > TargetValue;
 };
 
-/// STRING
-/// STRING
+
 /// STRING
 USTRUCT()
 struct FOSCT_StringLink: public FOSCT_ReceiverLink
@@ -387,8 +285,6 @@ struct FOSCT_StringPackLink: public FOSCT_ReceiverLink
 };
 
 /// NOTE
-/// NOTE
-/// NOTE
 USTRUCT()
 struct FOSCT_NoteLink: public FOSCT_ReceiverLink
 {
@@ -400,9 +296,88 @@ struct FOSCT_NoteLink: public FOSCT_ReceiverLink
 	FOSCT_Note TargetValue;
 };
 
-////////////// Sender
-////////////// Sender
-////////////// Sender
+
+///Packs
+
+/// EVENT PACK
+USTRUCT()
+struct FOSCT_EventPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<bool>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, bool >;
+};
+
+/// FLOAT PACK
+USTRUCT()
+struct FOSCT_FloatPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<float>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, float >;
+};
+
+/// VEC2 PACK
+USTRUCT()
+struct FOSCT_Vector2PackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<FVector2D>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, FVector2D >;
+};
+
+/// VEC3 PACK
+USTRUCT()
+struct FOSCT_Vector3PackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<FVector>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, FVector >;
+};
+
+/// ROTATION PACK
+USTRUCT()
+struct FOSCT_RotationPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<FRotator>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, FRotator >;
+};
+
+/// COLOR PACK
+USTRUCT()
+struct FOSCT_ColorPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<FLinearColor>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, FLinearColor > ;
+};
+
+/// TRANSFORM PACK
+USTRUCT()
+struct FOSCT_TransformPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<FTransform>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, FTransform >;
+
+};
+
+/// Sender
 USTRUCT(BlueprintType)
 struct FOSCT_Sender
 {
