@@ -2,13 +2,43 @@
 #include "Functions/OSCT_Parsing.h"
 
 #include "OSCManager.h"
+#include "OSCToolsetLog.h"
+
+#include "Functions/OSCT_Manager.h"
 
 
-bool UOSCT_Parsing::TryGetEvent(const FOSCMessage& InMessage, bool& OutValue)
+bool UOSCT_Parsing::GetMessagePackLength(const FOSCMessage& InMessage, FOSCT_PackData& OutData)
 {
-	return true;
+	//The component length is how many parts each component has, for example a VEC3 is 3 Components.
+	//ComponentLength+1 is each element of the pack (KEY+Values)
+	//The pack structure expects a string / key before the list of components, so that is why we divide by ComponentLength+1
+	//InMessage Argument Length / (ComponentLength+1)
+	int32 FoundLength = 0;
+	if (UOSCManager::GetInt32(InMessage, 0, FoundLength))
+	{
+		if (FoundLength > 0)
+		{
+			OutData.Length = FoundLength;
+			// OutData.TotalLength = (OutData.Length * OutData.ComponentLength) + (OutData.Length + 1);
+			// UE_LOG(OSCToolset, Warning, TEXT("Pack Data length: %d total: %d ComponentLength: %d"), OutData.Length, OutData.TotalLength, OutData.ComponentLength);
+			return true;
+		}
+	}
+	return false;
 }
 
+int32 UOSCT_Parsing::GetKeyIndex(const int32 Index, const FOSCT_PackData& InData)
+{
+	return (Index * (InData.ComponentLength + 1)) + 1;
+}
+
+
+//Single
+bool UOSCT_Parsing::TryGetEvent(const FOSCMessage& InMessage, bool& OutValue)
+{
+	//Events are like a trigger, no need to parse the value.
+	return true;
+}
 bool UOSCT_Parsing::TryGetFloat(const FOSCMessage& InMessage, float& OutValue)
 {
 	float X=0.0f;
@@ -21,39 +51,6 @@ bool UOSCT_Parsing::TryGetFloat(const FOSCMessage& InMessage, float& OutValue)
 	}
 	return false;
 }
-
-bool UOSCT_Parsing::TryGetFloatPack(const FOSCMessage& InMessage, TMap < FString, float >& OutMap)
-{
-	int32 Count = 0;
-	// Index 0 is our Length header
-	if (!UOSCManager::GetInt32(InMessage, 0, Count) || Count <= 0)
-	{
-		return false;
-	}
-
-	// Clear the map but keep the memory allocated for performance
-	OutMap.Empty(Count);
-
-	for (int32 i = 0; i < Count; ++i)
-	{
-		FString Key;
-		float Value = 0.0f;
-
-		// Key is at 1, 3, 5... | Value is at 2, 4, 6...
-		bool bKeyOk = UOSCManager::GetString(InMessage, (i * 2) + 1, Key);
-		bool bValOk = UOSCManager::GetFloat(InMessage, (i * 2) + 2, Value);
-
-		if (bKeyOk && bValOk)
-		{
-			OutMap.Add(MoveTemp(Key), Value);
-		}
-	}
-
-	// Return true only if we actually found data
-	return OutMap.Num() > 0;
-	
-}
-
 bool UOSCT_Parsing::TryGetVector2(const FOSCMessage& InMessage, FVector2D& OutValue)
 {
 	float X=0.0f, Y=0.0f;
@@ -67,7 +64,6 @@ bool UOSCT_Parsing::TryGetVector2(const FOSCMessage& InMessage, FVector2D& OutVa
 	}
 	return false;
 }
-
 bool UOSCT_Parsing::TryGetVector3(const FOSCMessage& InMessage, FVector& OutValue)
 {
 	float X=0.0f, Y=0.0f, Z=0.0f;
@@ -84,37 +80,6 @@ bool UOSCT_Parsing::TryGetVector3(const FOSCMessage& InMessage, FVector& OutValu
 	}
 	return false;
 }
-
-bool UOSCT_Parsing::TryGetFloatPack(const FOSCMessage& InMessage, TMap<FString, FVector>& OutMap)
-{
-	int32 Count = 0;
-	// Index 0: The "Length" header
-	if (!UOSCManager::GetInt32(InMessage, 0, Count) || Count <= 0) return false;
-
-	// Reuse memory: Clear the map but keep the buffer
-	OutMap.Empty(Count);
-
-	for (int32 i = 0; i < Count; ++i)
-	{
-		int32 KeyIndex = (i * 4) + 1;
-        
-		FString Key;
-		float X=0.0f, Y=0.0f, Z=0.0f;
-		
-		bool bSuccess = UOSCManager::GetString(InMessage, KeyIndex, Key)&&
-		UOSCManager::GetFloat(InMessage, KeyIndex + 1, X)&&
-		UOSCManager::GetFloat(InMessage, KeyIndex + 2, Y)&&
-		UOSCManager::GetFloat(InMessage, KeyIndex + 3, Z);
-
-		if (bSuccess)
-		{
-			OutMap.Add(MoveTemp(Key), FVector(X, Y, Z));
-		}
-	}
-
-	return OutMap.Num() > 0;
-}
-
 bool UOSCT_Parsing::TryGetRotation(const FOSCMessage& InMessage, FRotator& OutValue)
 {
 	float X=0.0f, Y=0.0f, Z=0.0f;
@@ -131,7 +96,6 @@ bool UOSCT_Parsing::TryGetRotation(const FOSCMessage& InMessage, FRotator& OutVa
 	}
 	return false;
 }
-
 bool UOSCT_Parsing::TryGetColor(const FOSCMessage& InMessage, FLinearColor& OutValue)
 {
 	float R=0.0f, G=0.0f, B=0.0f, A=0.0f;
@@ -148,7 +112,6 @@ bool UOSCT_Parsing::TryGetColor(const FOSCMessage& InMessage, FLinearColor& OutV
 	}
 	return false;
 }
-
 bool UOSCT_Parsing::TryGetTransform(const FOSCMessage& InMessage, FTransform& OutValue)
 {
 	float TX=0.0f, TY=0.0f, TZ=0.0f;
@@ -174,7 +137,6 @@ bool UOSCT_Parsing::TryGetTransform(const FOSCMessage& InMessage, FTransform& Ou
 	}
 	return false;
 }
-
 bool UOSCT_Parsing::TryGetString(const FOSCMessage& InMessage, FString& OutValue)
 {
 	FString Value;
@@ -187,7 +149,6 @@ bool UOSCT_Parsing::TryGetString(const FOSCMessage& InMessage, FString& OutValue
 	}
 	return false;
 }
-
 bool UOSCT_Parsing::TryGetNotes(const FOSCMessage& InMessage, FOSCT_Note& OutValue)
 {
 	int32 Pitch=0, Velocity=0, Voices=0;
@@ -202,4 +163,119 @@ bool UOSCT_Parsing::TryGetNotes(const FOSCMessage& InMessage, FOSCT_Note& OutVal
 		return true;
 	}
 	return false;
+}
+
+//Packs
+bool UOSCT_Parsing::TryGetEventPack(const FOSCMessage& InMessage, TMap<FString, bool>& OutMap)
+{
+	return TryGetGenericPack<bool>(
+		InMessage, 
+		OutMap, 
+		EOSCT_RouteType::EVENT_PACK, // Use your Event route type here
+		[](const FOSCMessage& Msg, int32 StartIdx, bool& OutVal) {
+			return UOSCManager::GetBool(Msg, StartIdx, OutVal);
+		});
+}
+bool UOSCT_Parsing::TryGetFloatPack(const FOSCMessage& InMessage, TMap < FString, float >& OutMap)
+{
+	return TryGetGenericPack<float>(
+		InMessage, 
+		OutMap, 
+		EOSCT_RouteType::FLOAT_PACK, 
+		[](const FOSCMessage& Msg, int32 StartIdx, float& OutVal) {
+			return UOSCManager::GetFloat(Msg, StartIdx, OutVal);
+		});
+}
+
+bool UOSCT_Parsing::TryGetVector2Pack(const FOSCMessage& InMessage, TMap<FString, FVector2D>& OutMap)
+{
+	return TryGetGenericPack<FVector2D>(
+		InMessage, 
+		OutMap, 
+		EOSCT_RouteType::VEC2_PACK, // Use your Event route type here
+		[](const FOSCMessage& Msg, int32 StartIdx, FVector2D& OutVal) {
+			float X=0.0f, Y=0.0f;
+			bool bOk = UOSCManager::GetFloat(Msg, StartIdx, X) && 
+					   UOSCManager::GetFloat(Msg, StartIdx + 1, Y); 
+			if (bOk) OutVal = FVector2D(X, Y);
+			return bOk;
+		});
+}
+bool UOSCT_Parsing::TryGetVector3Pack(const FOSCMessage& InMessage, TMap<FString, FVector>& OutMap)
+{
+	return TryGetGenericPack<FVector>(
+		InMessage, 
+		OutMap, 
+		EOSCT_RouteType::VEC3_PACK, 
+		[](const FOSCMessage& Msg, int32 StartIdx, FVector& OutVal) {
+			float X=0.0f, Y=0.0f, Z=0.0f;
+			bool bOk = UOSCManager::GetFloat(Msg, StartIdx, X) && 
+					   UOSCManager::GetFloat(Msg, StartIdx + 1, Y) && 
+					   UOSCManager::GetFloat(Msg, StartIdx + 2, Z);
+			if (bOk) OutVal = FVector(X, Y, Z);
+			return bOk;
+		});
+}
+bool UOSCT_Parsing::TryGetRotationPack(const FOSCMessage& InMessage, TMap<FString, FRotator>& OutMap)
+{
+	return TryGetGenericPack<FRotator>(
+		InMessage, 
+		OutMap, 
+		EOSCT_RouteType::VEC3_PACK, 
+		[](const FOSCMessage& Msg, int32 StartIdx, FRotator& OutVal) {
+			float X=0.0f, Y=0.0f, Z=0.0f;
+			bool bOk = UOSCManager::GetFloat(Msg, StartIdx, X) && 
+					   UOSCManager::GetFloat(Msg, StartIdx + 1, Y) && 
+					   UOSCManager::GetFloat(Msg, StartIdx + 2, Z);
+			if (bOk) OutVal = FRotator(X, Y, Z);
+			return bOk;
+		});
+
+}
+bool UOSCT_Parsing::TryGetColorPack(const FOSCMessage& InMessage, TMap<FString, FLinearColor>& OutMap)
+{
+	return TryGetGenericPack<FLinearColor>(
+	InMessage, 
+	OutMap, 
+	EOSCT_RouteType::COLOR_PACK, 
+	[](const FOSCMessage& Msg, int32 StartIdx, FLinearColor& OutVal) {
+		float R=0.0f, G=0.0f, B=0.0f, A=0.0f;
+		bool bOk = UOSCManager::GetFloat(Msg, StartIdx, R) && 
+				   UOSCManager::GetFloat(Msg, StartIdx + 1, G) &&
+				   UOSCManager::GetFloat(Msg, StartIdx + 2, B) &&
+				   UOSCManager::GetFloat(Msg, StartIdx + 3, A);
+		if (bOk) {
+			OutVal = FLinearColor(R, G, B, A);
+		}
+		return bOk;
+	});
+}
+bool UOSCT_Parsing::TryGetTransformPack(const FOSCMessage& InMessage, TMap<FString, FTransform>& OutMap)
+{
+	return TryGetGenericPack<FTransform>(
+		InMessage, 
+		OutMap, 
+		EOSCT_RouteType::TRANSFORM_PACK, 
+		[](const FOSCMessage& Msg, int32 StartIdx, FTransform& OutVal) {
+			float TX=0.0f, TY=0.0f, TZ=0.0f, RX=0.0f, RY=0.0f, RZ=0.0f, SX=1.0f, SY=1.0f, SZ=1.0f;
+			bool bOk = UOSCManager::GetFloat(Msg, StartIdx, TX) && 
+					   UOSCManager::GetFloat(Msg, StartIdx + 1, TY) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 2, TZ) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 3, RX) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 4, RY) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 5, RZ) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 6, SX) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 7, SY) &&
+					   UOSCManager::GetFloat(Msg, StartIdx + 8, SZ);
+        
+			if (bOk) {
+				OutVal = FTransform(FRotator(RX, RY, RZ), FVector(TX, TY, TZ), FVector(SX, SY, SZ));
+			}
+			return bOk;
+		});
+}
+bool UOSCT_Parsing::TryGetStringPack(const FOSCMessage& InMessage, TArray<FString>& OutValue)
+{
+	UOSCManager::GetAllStrings(InMessage, OutValue);
+	return true;
 }
