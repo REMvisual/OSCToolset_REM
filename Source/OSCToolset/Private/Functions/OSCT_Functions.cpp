@@ -6,6 +6,7 @@
 #include "OSCClient.h"
 #include "OSCAddress.h"
 #include "OSCT_ETypes.h"
+#include "OSCT_Modules.h"
 #include "OSCToolsetLog.h"
 
 
@@ -17,6 +18,85 @@ FString UOSCT_Functions::GetEnumString(T EnumValue)
 	return EnumPtr->GetNameStringByValue(static_cast<int64>(EnumValue));
 }
 
+EOSCT_ModuleType UOSCT_Functions::ConvertSenderTypeToModuleType(EOSCT_SenderType InSender)
+{
+	switch (InSender)
+	{
+	case EOSCT_SenderType::EVENT:  return EOSCT_ModuleType::EVENT;
+	case EOSCT_SenderType::FLOAT:  return EOSCT_ModuleType::FLOAT;
+	case EOSCT_SenderType::STRING: return EOSCT_ModuleType::STRING;
+	default:                       return EOSCT_ModuleType::EVENT;
+	}
+}
+
+EOSCT_SenderType UOSCT_Functions::ConvertModuleTypeToSenderType(EOSCT_ModuleType InModule)
+{
+	switch (InModule)
+	{
+	case EOSCT_ModuleType::EVENT:  return EOSCT_SenderType::EVENT;
+	case EOSCT_ModuleType::FLOAT:  return EOSCT_SenderType::FLOAT;
+	case EOSCT_ModuleType::STRING: return EOSCT_SenderType::STRING;
+	default:                       return EOSCT_SenderType::EVENT;
+	}
+}
+
+EOSCT_RouteType UOSCT_Functions::ConvertModuleTypeToRouteType(EOSCT_ModuleType InModule, const bool bPack)
+{
+	switch (InModule)
+	{
+	case EOSCT_ModuleType::EVENT:  
+		return bPack ? EOSCT_RouteType::EVENT_PACK : EOSCT_RouteType::EVENT;
+	case EOSCT_ModuleType::FLOAT:  
+		return bPack ? EOSCT_RouteType::FLOAT_PACK : EOSCT_RouteType::FLOAT;
+	case EOSCT_ModuleType::VEC2:
+		return bPack ? EOSCT_RouteType::VEC2_PACK : EOSCT_RouteType::VEC2;
+	case EOSCT_ModuleType::VEC3:   
+		return bPack ? EOSCT_RouteType::VEC3_PACK  : EOSCT_RouteType::VEC3;	
+	case EOSCT_ModuleType::COLOR:   
+		return bPack ? EOSCT_RouteType::COLOR_PACK  : EOSCT_RouteType::COLOR;		
+	case EOSCT_ModuleType::ROTATION:   
+		return bPack ? EOSCT_RouteType::ROTATION_PACK  : EOSCT_RouteType::ROTATION;		
+	case EOSCT_ModuleType::TRANSFORM:   
+		return bPack ? EOSCT_RouteType::TRANSFORM_PACK  : EOSCT_RouteType::TRANSFORM;		
+	case EOSCT_ModuleType::STRING:   
+		return bPack ? EOSCT_RouteType::STRING_PACK  : EOSCT_RouteType::STRING;		
+	case EOSCT_ModuleType::NOTE:   
+		return EOSCT_RouteType::NOTE; //No packs for notes, for now?	
+
+	default:                       
+		return EOSCT_RouteType::EVENT;
+	}
+
+}
+
+int32 UOSCT_Functions::GetComponentLength(EOSCT_RouteType Type)
+{
+	switch (Type)
+	{
+	case EOSCT_RouteType::EVENT:
+	case EOSCT_RouteType::EVENT_PACK:
+	case EOSCT_RouteType::FLOAT:
+	case EOSCT_RouteType::FLOAT_PACK:
+		return 1;
+	case EOSCT_RouteType::VEC2:
+	case EOSCT_RouteType::VEC2_PACK:
+		return 2;
+	case EOSCT_RouteType::VEC3:
+	case EOSCT_RouteType::VEC3_PACK:
+	case EOSCT_RouteType::ROTATION:
+	case EOSCT_RouteType::ROTATION_PACK:
+		return 3;
+	case EOSCT_RouteType::COLOR:
+	case EOSCT_RouteType::COLOR_PACK:
+		return 4;
+	case EOSCT_RouteType::TRANSFORM:
+	case EOSCT_RouteType::TRANSFORM_PACK:
+		return 9;
+	default:
+		return -1;
+	}
+}
+
 FString UOSCT_Functions::CleanupAddress(const FString& InAddress)
 {
 	FString CleanAddress = InAddress;
@@ -24,30 +104,48 @@ FString UOSCT_Functions::CleanupAddress(const FString& InAddress)
 	return CleanAddress;
 }
 
-bool UOSCT_Functions::FormatAddress(const FOSCT_Module& Module, FString& OutAddress)
+bool UOSCT_Functions::FormatAddress(const EOSCT_Role& Role, const EOSCT_ModuleType& ModuleType, const bool bPack, const FString& Address, FString& OutAddress)
 {
-	if (Module.Address.IsEmpty()) return false;
+	if (Address.IsEmpty()) return false;
 
-	FString RoleStr = GetEnumString(Module.Role).ToUpper();
-	FString ModuleStr = GetEnumString(Module.ModuleType).ToUpper();
+	OutAddress.Reset(); 
+
+	FString RoleStr = GetEnumString(Role).ToUpper().Left(1);
+	FString ModuleStr = GetEnumString(ModuleType).ToUpper();
    
-	FString CleanAddress = Module.Address;
-	CleanAddress.RemoveFromStart(TEXT("/"));
+	OutAddress.Append(TEXT("/OSCT/"));
+	OutAddress.Append(RoleStr);
+	OutAddress.AppendChar('/');
+	OutAddress.Append(ModuleStr);
+    
+	if (bPack)
+	{
+		OutAddress.Append(TEXT("/p"));
+	}
 
-	// Mutate the struct member directly
-	OutAddress = FString::Printf(TEXT("/OSCT/%s/%s%s/%s"), 
-	   *RoleStr, 
-	   *ModuleStr, 
-	   Module.Pack ? TEXT("/p") : TEXT(""), 
-	   *CleanAddress);
+	OutAddress.AppendChar('/');
+
+	if (Address.StartsWith(TEXT("/")))
+	{
+		OutAddress.Append(Address.RightChop(1));
+	}
+	else
+	{
+		OutAddress.Append(Address);
+	}
 
 	return true;
 }
 
-void UOSCT_Functions::SendModuleStateUpdate(UOSCClient* Client, const FOSCT_Module& Data, UObject* Context, bool bIsConnecting)
+FOSCMessage UOSCT_Functions::CreateStateUpdate(
+	UObject* Context,
+	const FString& Address,
+	const FString& FormattedAddress,
+	const EOSCT_Role& Role,
+	const EOSCT_ModuleType& ModuleType, 
+	const bool Pack,
+	const bool bIsConnecting)
 {
-	if (!Client || !Context) return;
-
 	FOSCMessage Msg;
 	FString Path = bIsConnecting ? TEXT("/OSCT/module_connected") : TEXT("/OSCT/module_disconnected");
 	
@@ -55,23 +153,147 @@ void UOSCT_Functions::SendModuleStateUpdate(UOSCClient* Client, const FOSCT_Modu
 	auto AddKVP = [&](FString Key, FString Value) {
 		UOSCManager::AddString(Msg, Key + "%" + Value);
 	};
-	
-	// // FString Formatted;
-	// if(!Data.FormattedAddress.IsEmpty())
-	// {
-	// 	AddKVP(TEXT("FormattedAddress"), Data.FormattedAddress);
-	// }
-	
-	AddKVP(TEXT("Name"), Context->GetName());
-	AddKVP(TEXT("Class"), Context->GetClass()->GetName());
-	AddKVP(TEXT("Address"), CleanupAddress(Data.Address));
-	AddKVP(TEXT("Formatted Address"), Data.FormattedAddress);
-	AddKVP(TEXT("Role Type"), UEnum::GetDisplayValueAsText(Data.Role).ToString().ToUpper());
-	AddKVP(TEXT("ModuleType"), GetEnumString(Data.ModuleType).ToUpper());
-	AddKVP(TEXT("Pack"), Data.Pack ? TEXT("true") : TEXT("false"));
-
-	FOSCAddress OSCAddr = UOSCManager::ConvertStringToOSCAddress(TEXT("/OSCT/module_connected"));
+	// 3. Populate Data
+	if (Context)
+	{
+		AddKVP(TEXT("Name"), Context->GetName());
+		AddKVP(TEXT("Class"), Context->GetClass()->GetName());
+	} else
+	{
+		AddKVP(TEXT("Name"), "");
+		AddKVP(TEXT("Class"), "");
+	}
+	AddKVP(TEXT("Address"), CleanupAddress(Address));
+	AddKVP(TEXT("Formatted Address"), FormattedAddress);
+	AddKVP(TEXT("Role Type"), UEnum::GetDisplayValueAsText(Role).ToString().ToUpper());
+	AddKVP(TEXT("ModuleType"), GetEnumString(ModuleType).ToUpper());
+	AddKVP(TEXT("Pack"), Pack ? TEXT("true") : TEXT("false"));
 	UOSCManager::SetOSCMessageAddress(Msg, UOSCManager::ConvertStringToOSCAddress(Path));
+	return Msg;
+}
+
+void UOSCT_Functions::SendReceiverStateUpdate(UOSCClient* Client, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting)
+{
+	if (!Client || !Context) return;
+
+	FOSCMessage Msg = CreateStateUpdate(
+		Context,
+		Data.Address,
+		Data.FormattedAddress,
+		Data.Role,
+		Data.ModuleType,
+		Data.Pack,
+		bIsConnecting
+	);
 	Client->SendOSCMessage(Msg);
-	UE_LOG(OSCToolset, Log, TEXT("Send Module State Update"));
+	// UE_LOG(OSCToolset, Log, TEXT("Send Module Receiver State Update"));
+}
+
+void UOSCT_Functions::SendSenderStateUpdate(UOSCClient* Client, const FOSCT_Sender& Data, UObject* Context,	bool bIsConnecting)
+{
+	if (!Client || !Context) return;
+
+	FOSCMessage Msg = CreateStateUpdate(
+		Context,
+		Data.Address,
+		Data.FormattedAddress,
+		Data.Role,
+		ConvertSenderTypeToModuleType(Data.Type),
+		false,
+		bIsConnecting
+	);
+	Client->SendOSCMessage(Msg);
+	// UE_LOG(OSCToolset, Log, TEXT("Send Module SENDER State Update"));
+}
+
+FColor UOSCT_Functions::GetModuleDebugColor(const EOSCT_ModuleType& ModuleType)
+{
+	FColor DebugColor = FColor::White;
+	switch (ModuleType)
+	{
+	case EOSCT_ModuleType::EVENT:
+		DebugColor = FColor(255, 0, 100);
+		break;
+	case EOSCT_ModuleType::FLOAT:
+		DebugColor = FColor(80, 255, 0);
+		break;
+	case EOSCT_ModuleType::VEC2:
+		DebugColor = FColor(0, 200, 255);
+		break;
+	case EOSCT_ModuleType::VEC3:
+		DebugColor = FColor(230, 200, 0);
+		break;
+	case EOSCT_ModuleType::COLOR:
+		DebugColor = FColor(0, 50, 255);
+		break;
+	case EOSCT_ModuleType::TRANSFORM:
+		DebugColor = FColor(255, 127, 0);
+		break;
+	case EOSCT_ModuleType::STRING:
+		DebugColor = FColor(230, 76, 255);
+		break;
+	case EOSCT_ModuleType::ROTATION:
+		DebugColor = FColor(127, 140, 255);
+		break;
+	case EOSCT_ModuleType::NOTE:
+		DebugColor = FColor(80, 80, 255);
+		break;
+	}
+	return DebugColor;
+}
+
+void UOSCT_Functions::DisplayDebug(const FOSCT_Receiver& Module, const FString& Message)
+{
+	// Use a hash of the address as a KEY so the message updates in place instead of scrolling
+	uint64 Key = GetTypeHash(Module.FormattedAddress);
+	FColor Color = (Module.Debug.DebugColor != FColor::White) 
+				   ? Module.Debug.DebugColor
+				   : GetModuleDebugColor(Module.ModuleType);
+
+	if (GEngine && Module.Debug.PrintOnScreen)
+	{
+		GEngine->AddOnScreenDebugMessage(Key, Module.Debug.DebugDuration, Color, Message);
+	}
+    
+	if (Module.Debug.PrintOnLog)
+	{
+		UE_LOG(OSCToolset, Log, TEXT("%s"), *Message);
+	}
+}
+
+void UOSCT_Functions::DebugModule(const FOSCT_Receiver& Module)
+{
+	if (!Module.Debug.PrintOnLog && !Module.Debug.PrintOnScreen) return;
+	DisplayDebug(Module, Module.FormattedAddress);
+}
+
+void UOSCT_Functions::DebugReceiver(const FOSCT_ReceiverLink& Receiver)
+{
+	const FOSCT_Receiver& Module = Receiver.Data;
+	if (!Module.Debug.PrintOnLog && !Module.Debug.PrintOnScreen) return;
+	
+	
+	//Use Target value as it works both for Tick and non tick messages.
+	FString ValueStr;
+	// switch (Module.ModuleType)
+	// {
+	// case EOSCT_ModuleType::VEC3:
+	// 	ValueStr = Receiver.TargetValue.ToString();
+	// 	break;
+	// case EOSCT_ModuleType::ROTATION:
+	// 	ValueStr = Receiver.TargetRotation.ToCompactString();
+	// 	break;
+	// case EOSCT_ModuleType::COLOR:
+	// 	ValueStr = Receiver.TargetColor.ToString();
+	// 	break;
+	// case EOSCT_ModuleType::TRANSFORM:
+	// 	ValueStr = Receiver.TargetValue.ToCompactString();
+	// 	break;
+	// default:
+	// 	ValueStr = FString::SanitizeFloat(Receiver.TargetValue.X);
+	// 	break;
+	// }
+
+	FString FullMessage = FString::Printf(TEXT("%s: %s"), *Module.FormattedAddress, *ValueStr);
+	DisplayDebug(Module, FullMessage);
 }
