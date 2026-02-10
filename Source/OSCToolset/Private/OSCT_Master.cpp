@@ -1,9 +1,7 @@
 ﻿#include "OSCT_Master.h"
 
-#include <rapidjson/document.h>
-
 #include "OSCManager.h"
-
+#include "OSCT_Modules.h"
 #include "Interfaces/OSCT_Router.h"
 #include "OSCToolsetLog.h"
 #include "Functions/OSCT_Functions.h"
@@ -11,7 +9,6 @@
 
 #include "OSCT_Settings.h"
 #include "UI/SOSCT_Menu.h"
-#include "Engine/Engine.h"
 #include "Widgets/SWeakWidget.h"
 
 #include "AssetRegistry/AssetData.h"
@@ -26,66 +23,86 @@
 
 #include "GameFramework/PlayerController.h" // Required for APlayerController
 
-#include "Kismet/KismetStringLibrary.h"
 
-
-void UOSCT_Master::AddModule(FOSCT_Module Module, UObject* Owner)
+void UOSCT_Master::AddReceiver(FOSCT_Receiver Receiver, UObject* Owner)
 {
     if (!Owner) return;
     
-    if (UOSCT_Functions::FormatAddress(Module, Module.FormattedAddress))
+    if (UOSCT_Functions::FormatAddress(
+        Receiver.Role,
+        Receiver.ModuleType,
+        Receiver.Pack,
+        Receiver.Address,
+        Receiver.FormattedAddress))
     {
+        FName AddressKey = FName(*Receiver.FormattedAddress);
         if (!Owner->Implements<UOSCT_Router>())
         {
-            UE_LOG(OSCToolset, Warning, TEXT("%s needs to implement OSCT_Router interface. Trying to receive address: %s"), *Owner->GetName(), *Module.FormattedAddress);
+            UE_LOG(OSCToolset, Warning, TEXT("%s needs to implement OSCT_Router interface. Trying to receive address: %s"), 
+                *Owner->GetName(), *Receiver.FormattedAddress);
             return;
         }
+
+        switch (Receiver.ModuleType)
+        {
+        case EOSCT_ModuleType::EVENT:
+            if (Receiver.Pack) AddReceiverLink(EventPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(EventLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::FLOAT:
+            if (Receiver.Pack) AddReceiverLink(FloatPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(FloatLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::VEC2:
+            if (Receiver.Pack) AddReceiverLink(Vec2PackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(Vec2Links, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::VEC3:
+            if (Receiver.Pack) AddReceiverLink(Vec3PackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(Vec3Links, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::ROTATION:
+            if (Receiver.Pack) AddReceiverLink(RotationPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(RotationLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::COLOR:
+            if (Receiver.Pack) AddReceiverLink(ColorPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(ColorLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::TRANSFORM:
+            UE_LOG(OSCToolset, Warning, TEXT("Adding a transform ?"));
+            if (Receiver.Pack) AddReceiverLink(TransformPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(TransformLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::STRING:
+            if (Receiver.Pack) AddReceiverLink(StringPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(StringLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::NOTE:
+            AddReceiverLink(NoteLinks, AddressKey, Receiver, Owner);
+            break;
+        default:
+            break;
+        }
+        IOSCT_Router::Execute_OnReceiverAdded(Owner, Receiver);
+        UOSCT_Functions::SendReceiverStateUpdate(OSCT_Client, Receiver, Owner, true);
         
-        FName AddressKey = FName(*Module.FormattedAddress);
-        
-        FOSCT_ReceiverLink NewReceiverLink;
-        NewReceiverLink.Data = Module;
-        NewReceiverLink.Owner = Owner;
-        
-        ReceiverMap.FindOrAdd(AddressKey).AddUnique(NewReceiverLink);
-        IOSCT_Router::Execute_OnRegisterOSCTModule(Owner, NewReceiverLink.Data);
-        UOSCT_Functions::SendModuleStateUpdate(OSCT_Client, NewReceiverLink.Data, Owner, true);
-        UE_LOG(OSCToolset, Log, TEXT("Added OSCT Receiver: %s to Owner: %s"), 
-            *Module.FormattedAddress, *Owner->GetName());    
+        UE_LOG(OSCToolset, Log, TEXT("Added OSCT %s: %s to Owner: %s"), 
+            *UOSCT_Functions::GetEnumString(Receiver.Role), *Receiver.FormattedAddress, *Owner->GetName());    
     }
-    // if (!FormattedAddress.IsEmpty())
-    // {
-    //     if (!Owner->Implements<UOSCT_Router>())
-    //     {
-    //         UE_LOG(OSCToolset, Warning, TEXT("%s needs to implement OSCT_Router interface. Trying to receive address: %s"), *Owner->GetName(), *FormattedAddress);
-    //         return;
-    //     }
-    //     
-    //     FName AddressKey = FName(*FormattedAddress);
-    //     
-    //     FOSCT_ReceiverLink NewReceiverLink;
-    //     NewReceiverLink.Data = Module;
-    //     NewReceiverLink.Data.Owner = Owner;
-    //     
-    //     ReceiverMap.FindOrAdd(AddressKey).AddUnique(NewReceiverLink);
-    //     IOSCT_Router::Execute_OnRegisterOSCTModule(Owner, NewReceiverLink.Data);
-    //     UOSCT_Functions::SendModuleStateUpdate(OSCT_Client, NewReceiverLink.Data, Owner, true);
-    //     UE_LOG(OSCToolset, Log, TEXT("Added OSCT Receiver: %s to Owner: %s"), 
-    //         *FormattedAddress, *Owner->GetName());    
-    //
-    // }
     else
     {
         // ERROR: This is where you log it!
-        UE_LOG(OSCToolset, Error, TEXT("OSCT_Master: Failed to add module from %s. Address or Prefix is missing."), *Owner->GetName());
+        UE_LOG(OSCToolset, Error, TEXT("OSCT_Master: Failed to add module from %s. Address or Prefix is missing."), 
+            *Owner->GetName());
     }
 }
 
-void UOSCT_Master::AddManyModules(TArray<FOSCT_Module> Modules, UObject* Owner)
+void UOSCT_Master::AddManyReceivers(TArray<FOSCT_Receiver> Receivers, UObject* Owner)
 {
-    for (const FOSCT_Module Module : Modules)
+    for (const FOSCT_Receiver Module : Receivers)
     {
-        AddModule(Module, Owner);
+        AddReceiver(Module, Owner);
     }
 }
 
@@ -130,60 +147,85 @@ void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner
     // }
 }
 
-
-void UOSCT_Master::RemoveModule(const FOSCT_Module Module, UObject* Owner)
+void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Module, UObject* Owner)
 {
     if (!Owner) return;
-    
-    // const FString& FormattedAddress = Module.GetFormattedAddress();
-    // FString Address;
-    if (!Module.FormattedAddress.IsEmpty()) //Here the module should have the Formatted Address set.
+    if (UOSCT_Functions::FormatAddress(
+        Module.Role,
+        Module.ModuleType,
+        Module.Pack,
+        Module.Address,
+        Module.FormattedAddress))
     {
         FName AddressKey = FName(*Module.FormattedAddress);
-        if (TArray<FOSCT_ReceiverLink>* Links = ReceiverMap.Find(AddressKey))
+        if (const EOSCT_RouteType* RouteTypePtr = AddressToType.Find(AddressKey))
         {
-            for (const FOSCT_ReceiverLink& Link : *Links)
+            switch (*RouteTypePtr)
             {
-                if (Link.GetOwner() == Owner && Link.HasValidOwner())
-                {
-                    // Call the interface before actually deleting the link
-                    IOSCT_Router::Execute_OnRemovedOSCTModule(Link.GetOwner(), Module);
-                }
+            case EOSCT_RouteType::EVENT:
+                RemoveReceiverLink(EventLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::EVENT_PACK:
+                RemoveReceiverLink(EventPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::FLOAT:
+                RemoveReceiverLink(FloatLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::FLOAT_PACK:
+                RemoveReceiverLink(FloatPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::VEC2:
+                RemoveReceiverLink(Vec2Links, AddressToType, AddressKey, Owner);
+                break;;
+            case EOSCT_RouteType::VEC2_PACK:
+                RemoveReceiverLink(Vec2PackLinks, AddressToType, AddressKey, Owner);
+                break;;
+            case EOSCT_RouteType::VEC3:
+                RemoveReceiverLink(Vec3Links, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::VEC3_PACK:
+                RemoveReceiverLink(Vec3PackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::ROTATION:
+                RemoveReceiverLink(RotationLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::ROTATION_PACK:
+                RemoveReceiverLink(RotationPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::COLOR:
+                RemoveReceiverLink(ColorLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::COLOR_PACK:
+                RemoveReceiverLink(ColorPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::TRANSFORM:
+                RemoveReceiverLink(TransformLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::TRANSFORM_PACK:
+                RemoveReceiverLink(TransformPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::STRING:
+                RemoveReceiverLink(StringLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::STRING_PACK:
+                RemoveReceiverLink(StringPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::NOTE:
+                RemoveReceiverLink(NoteLinks, AddressToType, AddressKey, Owner);
+                break;
+            default:
+                UE_LOG(OSCToolset, Warning, TEXT("Did not implement removing the receiver for this type: %s"), *Module.FormattedAddress);
+                break;
             }
-            // Just do the work. The predicate handles the "Search & Destroy".
-            Links->RemoveAll([Owner](const FOSCT_ReceiverLink& L) {
-                return L.GetOwner() == Owner || !L.HasValidOwner();
-            });
-            // If the list is empty, delete the map key.
-            if (Links->Num() == 0)
-            {
-                ReceiverMap.Remove(AddressKey);
-            }
-            UE_LOG(OSCToolset, Log, TEXT("Removed OSCT Receiver: %s to Owner: %s"), *Module.FormattedAddress, *Owner->GetName());
-
+            //Maybe send the disconnected module state update?
+            UE_LOG(OSCToolset, Log, TEXT("Unregistered OSCT Receiver: %s"), *Module.FormattedAddress);
         }
     }
 }
 
 void UOSCT_Master::RemoveAllReceivers()
 {
-    // CreateIterator allows us to modify the map while we loop through it
-    for (auto MapIt = ReceiverMap.CreateIterator(); MapIt; ++MapIt)
-    {
-        TArray<FOSCT_ReceiverLink>& Links = MapIt.Value();
-
-        // 1. Prune the array of any links where the Owner is now null
-        Links.RemoveAll([](const FOSCT_ReceiverLink& L) {
-            return !L.HasValidOwner();
-        });
-
-        // 2. If no one is listening to this address anymore, kill the Map Key
-        if (Links.Num() == 0)
-        {
-            MapIt.RemoveCurrent();
-        }
-    }
-    
+    CleanupLinks();    
     UE_LOG(OSCToolset, Log, TEXT("Removed all receivers."));
 }
 
@@ -229,7 +271,6 @@ void UOSCT_Master::InitializeOSC()
         SendOSCTBaseMessage(OSCT_Init_addr);
         UE_LOG(OSCToolset, Log, TEXT("Send OSCT Master Init message"));
         OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::RouteMessage);
-        // OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::SetCommands); //TODO-Pass this to the Route Message Function.
     }
     if (OSCT_Client != nullptr)
     {
@@ -243,6 +284,27 @@ void UOSCT_Master::OnLevelChanged(const FString& LevelName)
     // RemoveAllReceivers(); //Make sure the listeners are gone before a new level is loaded.
     UE_LOG(OSCToolset, Log, TEXT("OnLevelChanged: %s"), *LevelName);
     SendOSCTBaseMessage(OSCT_OnLevelChanged_addr);
+}
+
+void UOSCT_Master::CleanupLinks()
+{
+    EventLinks.Empty();
+    EventPackLinks.Empty();
+    FloatLinks.Empty();
+    FloatPackLinks.Empty();
+    Vec2Links.Empty();
+    Vec2PackLinks.Empty();
+    Vec3Links.Empty();
+    Vec3PackLinks.Empty();
+    RotationLinks.Empty();
+    RotationPackLinks.Empty();
+    ColorLinks.Empty();
+    ColorPackLinks.Empty();
+    TransformLinks.Empty();
+    TransformPackLinks.Empty();
+    StringLinks.Empty();
+    StringPackLinks.Empty();
+    NoteLinks.Empty();
 }
 
 void UOSCT_Master::SendOSCTBaseMessage(FString Message)
@@ -302,30 +364,10 @@ FString UOSCT_Master::SetLocalIPAddress(FString InAddress, bool Log)
     }
 }
 
-void UOSCT_Master::SetCommands(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
-{
-    APlayerController* PC = GetWorld()->GetFirstPlayerController();
-
-    FString cmd_addr = OSCT_Base_addr + "R/CMD";
-
-    FString msg = UOSCManager::GetOSCAddressFullPath(UOSCManager::GetOSCMessageAddress(InMessage));
-
-    if (UKismetStringLibrary::EqualEqual_StrStr(cmd_addr, msg))
-    {
-        //Once we checked if the Module Formatted address equals exactly to the incoming address, we can call GET_Message.
-        if (PC)
-        {
-            FString cmd = "";
-            UOSCManager::GetString(InMessage, 0, cmd);
-            UE_LOG(LogTemp, Log, TEXT("Set command fixed rate: %s cmd: %s"), *msg, *cmd);
-            PC->ConsoleCommand(cmd, true);
-        }
-    }
-}
 
 void UOSCT_Master::LogSettings()
 {
-    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Addresss: %s | Client Port: %d"), *SetLocalIPAddress(Settings->ServerAddress, true), Settings->ServerPort, *SetLocalIPAddress(Settings->ClientAddress, true), Settings->ClientPort);
+    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Address: %s | Client Port: %d"), *SetLocalIPAddress(Settings->ServerAddress, true), Settings->ServerPort, *SetLocalIPAddress(Settings->ClientAddress, true), Settings->ClientPort);
 }
 
 void UOSCT_Master::ToggleOSCTMenu()
@@ -346,7 +388,7 @@ void UOSCT_Master::ToggleOSCTMenu()
             OSCTMenu->OnReInitOSCT.BindLambda([this]()
                 {
                     // Handle re-initialization logic here
-                    reinit_OSCT_Master(); // Replace with your actual re-init function
+                    reinit_OSCT_Master();
                 });
 
             if (PlayerController) {
@@ -380,9 +422,8 @@ void UOSCT_Master::Deinitialize()
 
     Super::Deinitialize();
     // Clean up any resources here
-
+    CleanupLinks();
     FCoreUObjectDelegates::PreLoadMap.RemoveAll(this); //Cleanup On Level Loaded Static Delegate.
-
 }
 
 void UOSCT_Master::shutdown_OSCT_Master()
@@ -401,8 +442,7 @@ void UOSCT_Master::shutdown_OSCT_Master()
             FOSCMessage Msg;
             UOSCManager::SetOSCMessageAddress(Msg, Addr);
             
-            // Add a reason or timestamp if you want!
-            UOSCManager::AddString(Msg, TEXT("User_Exit"));
+            UOSCManager::AddString(Msg, TEXT("OSCT Shutdown"));
 
             OSCT_Client->SendOSCMessage(Msg);
         }
@@ -425,248 +465,485 @@ void UOSCT_Master::shutdown_OSCT_Master()
 void UOSCT_Master::reinit_OSCT_Master()
 {
     UE_LOG(OSCToolset, Log, TEXT("Start Re-Init the OSCT Master."));
-
+    UE_LOG(OSCToolset, Log, TEXT("Total unique receivers in Map: %d"), ReceiverMap.Num());
     shutdown_OSCT_Master(); //First shutdown and clear
     init_OSCT_Master(); //Then init the OSCT Master again
+    
+    ReSendAllReceiversStateUpdate(); //For manual reset, we need to call the update.
 }
+
+void UOSCT_Master::ReSendAllReceiversStateUpdate()
+{
+    //Resend the module connected for each added receiver:
+    for (auto& Pair : ReceiverMap)
+    {
+        // Pair.Key is the FName
+        // Pair.Value is the TArray<FOSCT_ReceiverLink>
+        for (FOSCT_ReceiverLink& Link : Pair.Value)
+        {
+            // Example: UE_LOG(LogTemp, Log, TEXT("Key: %s | Link Data: %s"), *Pair.Key.ToString(), *Link.SomeProperty);
+            UOSCT_Functions::SendReceiverStateUpdate(OSCT_Client, Link.Data, Link.GetOwner(), true);
+        }
+    }
+
+}
+
+bool UOSCT_Master::SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner)
+{
+    if (Sender.FormattedAddress.IsEmpty())
+    {
+        UOSCT_Functions::FormatAddress(
+            Sender.Role, 
+            ModuleType,
+            false,
+            Sender.Address,
+            Sender.FormattedAddress);
+        
+        Sender.CachedFullAddress = UOSCManager::ConvertStringToOSCAddress(Sender.FormattedAddress);
+        Sender.Type = UOSCT_Functions::ConvertModuleTypeToSenderType(ModuleType);
+        UE_LOG(OSCToolset, Log, TEXT("Added a new sender? %s"), *Sender.FormattedAddress)
+        UOSCT_Functions::SendSenderStateUpdate(OSCT_Client, Sender, Owner, true);
+        return true;
+    } 
+    return false;
+}
+
+void UOSCT_Master::Send_Event(FOSCT_Sender& Sender, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::EVENT, Owner);
+    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        float GameTime = GetWorld()->GetRealTimeSeconds();
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, GameTime);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        OSCT_Client->SendOSCMessage(Msg);
+    }
+}
+
+void UOSCT_Master::Send_Float(FOSCT_Sender& Sender, const float Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::FLOAT, Owner);
+    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        OSCT_Client->SendOSCMessage(Msg);
+    }
+}
+
+void UOSCT_Master::Send_String(FOSCT_Sender& Sender, const FString& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::STRING, Owner);
+    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddString(Msg, Value);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        OSCT_Client->SendOSCMessage(Msg);
+    }
+}
+
+bool UOSCT_Master::HandleCommands(const FOSCMessage& InMessage)
+{
+    FOSCAddress Addr = UOSCManager::GetOSCMessageAddress(InMessage);
+    FString Path = UOSCManager::GetOSCAddressFullPath(Addr);
+    
+    // Check if this message is actually a command for us
+    FString TargetCmdPath = OSCT_Base_addr + "R/CMD";
+    if (!Path.Equals(TargetCmdPath))
+    {
+        return false; // Not a command message
+    }
+
+    // It is a command! Proceed with execution
+    APlayerController* PC = GetWorld()->GetFirstPlayerController();
+    if (PC)
+    {
+        FString Cmd = "";
+        if (UOSCManager::GetString(InMessage, 0, Cmd))
+        {
+            UE_LOG(OSCToolset, Log, TEXT("Executing Command: %s"), *Cmd);
+            PC->ConsoleCommand(Cmd, true);
+        }
+    }
+    return true; // Message handled
+}
+
 
 void UOSCT_Master::RouteMessage(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
 {
+
     FString Address = UOSCManager::GetOSCAddressFullPath(UOSCManager::GetOSCMessageAddress(InMessage));
     FName AddressKey = FName(*Address);
-    TArray<FOSCT_ReceiverLink>* ReceiverLinks = ReceiverMap.Find(AddressKey);
-    if (!ReceiverLinks) return;
     
-    for (FOSCT_ReceiverLink& Link : *ReceiverLinks)
+    if (const EOSCT_RouteType* RouteTypePtr = AddressToType.Find(AddressKey))
     {
-        if (Link.HasValidOwner())
-        {   
-            switch (Link.Data.ModuleType)
+        switch (*RouteTypePtr)
+        {
+        case EOSCT_RouteType::FLOAT:
+        {
+            float Val;
+            if (UOSCT_Parsing::TryGetFloat(InMessage, Val))
             {
-            case EOSCT_ModuleType::EVENT:
+                if (auto* Links = UpdateAndPrune(FloatLinks, AddressToType, AddressKey, Val))
+                {
+                    for (const FOSCT_FloatLink& Link : *Links)
+                    {
+                        IOSCT_Router::Execute_GET_Float(Link.Owner.Get(), Link.Data, Val);
+                        if (!Link.bNeedsInterpolation)
+                        { 
+                            //First message to Tick events on the Router.
+                            IOSCT_Router::Execute_GET_Float_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                        }
+                    }
+                }
+            }
+        break;
+        }
+        case EOSCT_RouteType::EVENT:
+        {
+            if (auto* Links = UpdateAndPrune(EventLinks, AddressToType, AddressKey, false))
+            {
+                for (const FOSCT_EventLink& Link : *Links)
                 {
                     IOSCT_Router::Execute_GET_Event(Link.GetOwner(), Link.Data);
-                    break;   
-                }
-            case EOSCT_ModuleType::FLOAT:
-                {
-                    float Value;
-                    if (UOSCT_Parsing::TryGetFloat(InMessage, Value))
-                    {
-                        Link.TargetValue.X = Value;
-                        //Link.bNeedsInterpolation = true;
-                        IOSCT_Router::Execute_GET_Float(Link.GetOwner(), Link.Data, Value);
-                    }
-                    break;
-                }
-            case EOSCT_ModuleType::VEC2:
-                {
-                    FVector2D Value;
-                    if (UOSCT_Parsing::TryGetVector2(InMessage, Value))
-                    {
-                        Link.TargetValue.X = Value.X;
-                        Link.TargetValue.Y = Value.Y;
-                        //Link.bNeedsInterpolation = true;
-                        
-                        IOSCT_Router::Execute_GET_Vector2(Link.GetOwner(), Link.Data, Value);
-                    }
-                    break;
-                }
-            case EOSCT_ModuleType::VEC3:
-                {
-                    FVector Value;
-                    if (UOSCT_Parsing::TryGetVector3(InMessage, Value))
-                    {
-                        Link.TargetValue.X = Value.X;
-                        Link.TargetValue.Y = Value.Y;
-                        Link.TargetValue.Z = Value.Z;
-                        //Link.bNeedsInterpolation = true;
-                        
-                        IOSCT_Router::Execute_GET_Vector3(Link.GetOwner(), Link.Data, Value);
-                    }
-                break;
-                }
-            case EOSCT_ModuleType::ROTATION:
-                {
-                    FRotator Value;
-                    if (UOSCT_Parsing::TryGetRotation(InMessage, Value))
-                    {
-                        Link.TargetRotation.Pitch = Value.Pitch;
-                        Link.TargetRotation.Roll = Value.Roll;
-                        Link.TargetRotation.Yaw = Value.Yaw;
-                        //Link.bNeedsInterpolation = true;
-                        
-                        IOSCT_Router::Execute_GET_Rotation(Link.GetOwner(), Link.Data, Value);
-                    }
-                break;
-                }
-            case EOSCT_ModuleType::COLOR:
-                {
-                    FLinearColor Value;
-                    if (UOSCT_Parsing::TryGetColor(InMessage, Value))
-                    {
-                        Link.TargetColor.R = Value.R;
-                        Link.TargetColor.G = Value.G;
-                        Link.TargetColor.B = Value.B;
-                        Link.TargetColor.A = Value.A;
-                        //Link.bNeedsInterpolation = true;
-                        
-                        IOSCT_Router::Execute_GET_Color(Link.GetOwner(), Link.Data, Value);
-                    }
-                break;
-                }
-            case EOSCT_ModuleType::TRANSFORM:
-                {
-                    FTransform Value;
-                    if (UOSCT_Parsing::TryGetTransform(InMessage, Value))
-                    {
-                        Link.TargetValue = Value.GetLocation();
-                        Link.TargetRotation = Value.Rotator();
-                        Link.TargetScale = Value.GetScale3D();
-                        //Link.bNeedsInterpolation = true;
-                        
-                        IOSCT_Router::Execute_GET_Transform(Link.GetOwner(), Link.Data, Value);
-                    }
-                break;
-                }
-            case EOSCT_ModuleType::STRING:
-                {
-                    FString Value;
-                    if (UOSCT_Parsing::TryGetString(InMessage, Value))
-                    {
-                        //Link.bNeedsInterpolation = false;
-                        IOSCT_Router::Execute_GET_String(Link.GetOwner(), Link.Data, Value);
-                    }
-                break;
-                }
-            case EOSCT_ModuleType::NOTE:
-                {
-                    FOSCT_Note Value;
-                    if (UOSCT_Parsing::TryGetNotes(InMessage, Value))
-                    {
-                        Link.bNeedsInterpolation = false;
-                        IOSCT_Router::Execute_GET_Notes(Link.GetOwner(), Link.Data, Value);
-                    }
-                break;
-                }
-            default:
-                {
-                //Non OSCT formatted messages... Send through IOSCT_Router::Execute_OnOSCMessageReceived
-                break;
                 }
             }
-            IOSCT_Router::Execute_OnOSCMessageReceived(Link.GetOwner(), Address, InMessage);
-            if (!Link.bInitialized)
+        break;
+        }
+        case EOSCT_RouteType::VEC2:
+        {
+            FVector2D Val;
+            if (UOSCT_Parsing::TryGetVector2(InMessage, Val))
             {
-                //First message link
-                Link.CurrentValue = Link.TargetValue;
-                Link.CurrentRotation   = Link.TargetRotation;
-                Link.CurrentScale = Link.TargetScale;
-                Link.CurrentColor = Link.TargetColor;
-                
-                Link.bInitialized = true;
-                Link.bNeedsInterpolation = false; // Stay asleep
-                
-                IOSCT_Router::Execute_OnOSCTModuleInit(Link.GetOwner(), Link.Data);
-                
-                //For modules that need interpolation, we call a first event to send the base value
-                IOSCT_Router::Execute_GET_Float_Tick(Link.GetOwner(), Link.Data, Link.CurrentValue.X);
-                IOSCT_Router::Execute_GET_Vector2_Tick(Link.GetOwner(), Link.Data, FVector2D(Link.CurrentValue.X, Link.CurrentValue.Y));
-                IOSCT_Router::Execute_GET_Vector3_Tick(Link.GetOwner(), Link.Data, Link.CurrentValue);
-                IOSCT_Router::Execute_GET_Rotation_Tick(Link.GetOwner(), Link.Data, Link.CurrentRotation);
-                IOSCT_Router::Execute_GET_Color_Tick(Link.GetOwner(), Link.Data, Link.CurrentColor);
-                FTransform TransformFirstValue(
-                    Link.CurrentRotation, 
-                    Link.CurrentValue,    
-                    Link.CurrentScale     
-                );
-                IOSCT_Router::Execute_GET_Transform_Tick(Link.GetOwner(), Link.Data, TransformFirstValue);
-            } else
-            {
-                Link.bNeedsInterpolation = Link.Data.Tick.bEnable;
+                if (auto* Links = UpdateAndPrune(Vec2Links, AddressToType, AddressKey, Val))
+                {
+                    for (const FOSCT_Vector2Link& Link : *Links)
+                    {
+                        IOSCT_Router::Execute_GET_Vector2(Link.GetOwner(), Link.Data, Val);
+                    }
+                }
             }
+            break;
+        }
+        case EOSCT_RouteType::VEC3:
+            {
+                FVector Val;
+                if (UOSCT_Parsing::TryGetVector3(InMessage, Val))
+                {
+                    if (auto* Links = UpdateAndPrune(Vec3Links, AddressToType, AddressKey, Val))
+                    {
+                        for (const FOSCT_Vector3Link& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Vector3(Link.GetOwner(), Link.Data, Val);
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::ROTATION:
+            {
+                FRotator Val;
+                if (UOSCT_Parsing::TryGetRotation(InMessage, Val))
+                {
+                    if (auto* Links = UpdateAndPrune(RotationLinks, AddressToType, AddressKey, Val))
+                    {
+                        for (const FOSCT_RotationLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Rotation(Link.GetOwner(), Link.Data, Val);
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::COLOR:
+            {
+                FLinearColor Val;
+                if (UOSCT_Parsing::TryGetColor(InMessage, Val))
+                {
+                    if (auto* Links = UpdateAndPrune(ColorLinks, AddressToType, AddressKey, Val))
+                    {
+                        for (const FOSCT_ColorLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Color(Link.GetOwner(), Link.Data, Val);
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::TRANSFORM:
+            {
+                FTransform Val;
+                if (UOSCT_Parsing::TryGetTransform(InMessage, Val))
+                {
+                    if (auto* Links = UpdateAndPrune(TransformLinks, AddressToType, AddressKey, Val))
+                    {
+                        for (const FOSCT_TransformLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Transform(Link.GetOwner(), Link.Data, Val);
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::STRING:
+            {
+                FString Val;
+                if (UOSCT_Parsing::TryGetString(InMessage, Val))
+                {
+                    if (auto* Links = UpdateAndPrune(StringLinks, AddressToType, AddressKey, Val))
+                    {
+                        for (const FOSCT_StringLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_String(Link.GetOwner(), Link.Data, Val);
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::NOTE:
+            {
+                FOSCT_Note Val;
+                if (UOSCT_Parsing::TryGetNotes(InMessage, Val))
+                {
+                    if (auto* Links = UpdateAndPrune(NoteLinks, AddressToType, AddressKey, Val))
+                    {
+                        for (const FOSCT_NoteLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Notes(Link.GetOwner(), Link.Data, Val);
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::FLOAT_PACK:
+            {
+                TMap<FString, float> Map;
+                if (UOSCT_Parsing::TryGetFloatPack(InMessage, Map))
+                {
+                    if (auto * Links = UpdateAndPrune(FloatPackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_FloatPackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Float_Pack(Link.Owner.Get(), Link.Data, Map);
+                            if (!Link.bNeedsInterpolation)
+                            { 
+                                //First message to Tick events on the Router.
+                                IOSCT_Router::Execute_GET_Float_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::EVENT_PACK:
+            {
+                TMap<FString, bool> Map;
+                if (UOSCT_Parsing::TryGetEventPack(InMessage, Map))
+                {
+                    if (auto* Links = UpdateAndPrune(EventPackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_EventPackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Event_Pack(Link.Owner.Get(), Link.Data, Map);
+                            
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::VEC2_PACK:
+            {
+                TMap<FString, FVector2D> Map;
+                if (UOSCT_Parsing::TryGetVector2Pack(InMessage, Map))
+                {
+                    if (auto * Links = UpdateAndPrune(Vec2PackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_Vector2PackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Vector2_Pack(Link.Owner.Get(), Link.Data, Map);
+                            if (!Link.bNeedsInterpolation)
+                            { 
+                                //First message to Tick events on the Router.
+                                IOSCT_Router::Execute_GET_Vector2_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::VEC3_PACK:
+        {
+            TMap<FString, FVector> Map;
+            if (UOSCT_Parsing::TryGetVector3Pack(InMessage, Map))
+            {
+                if (auto * Links = UpdateAndPrune(Vec3PackLinks, AddressToType, AddressKey, Map))
+                {
+                    for (const FOSCT_Vector3PackLink& Link : *Links)
+                    {
+                        IOSCT_Router::Execute_GET_Vector3_Pack(Link.Owner.Get(), Link.Data, Map);
+                        if (!Link.bNeedsInterpolation)
+                        { 
+                            //First message to Tick events on the Router.
+                            IOSCT_Router::Execute_GET_Vector3_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case EOSCT_RouteType::ROTATION_PACK:
+            {
+                TMap<FString, FRotator> Map;
+                if (UOSCT_Parsing::TryGetRotationPack(InMessage, Map))
+                {
+                    if (auto * Links = UpdateAndPrune(RotationPackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_RotationPackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Rotation_Pack(Link.Owner.Get(), Link.Data, Map);
+                            if (!Link.bNeedsInterpolation)
+                            { 
+                                //First message to Tick events on the Router.
+                                IOSCT_Router::Execute_GET_Rotation_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::COLOR_PACK:
+            {
+                TMap<FString, FLinearColor> Map;
+                if (UOSCT_Parsing::TryGetColorPack(InMessage, Map))
+                {
+                    if (auto * Links = UpdateAndPrune(ColorPackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_ColorPackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Color_Pack(Link.Owner.Get(), Link.Data, Map);
+                            if (!Link.bNeedsInterpolation)
+                            { 
+                                //First message to Tick events on the Router.
+                                IOSCT_Router::Execute_GET_Color_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::TRANSFORM_PACK:
+            {
+                TMap<FString, FTransform> Map;
+                
+                if (UOSCT_Parsing::TryGetTransformPack(InMessage, Map))
+                {
+                    if (auto * Links = UpdateAndPrune(TransformPackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_TransformPackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_Transform_Pack(Link.Owner.Get(), Link.Data, Map);
+                            if (!Link.bNeedsInterpolation)
+                            { 
+                                //First message to Tick events on the Router.
+                                IOSCT_Router::Execute_GET_Transform_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+        case EOSCT_RouteType::STRING_PACK:
+            {
+                TArray<FString> Map;
+                if (UOSCT_Parsing::TryGetStringPack(InMessage, Map))
+                {
+                    if (auto * Links = UpdateAndPrune(StringPackLinks, AddressToType, AddressKey, Map))
+                    {
+                        for (const FOSCT_StringPackLink& Link : *Links)
+                        {
+                            IOSCT_Router::Execute_GET_String_Pack(Link.Owner.Get(), Link.Data, Map);
+                        }
+                    }
+                }
+                break;
+            }
+        default:
+            UE_LOG(OSCToolset, Warning, TEXT("Received a message not well formatted from a Receiver: %s"), *Address);
+            break;
         }
     }
+    // Try to handle as a command last
+    HandleCommands(InMessage);
 }
+
 void UOSCT_Master::Tick(float DeltaTime)
 {
     // Important: Only tick if the game is actually running/unpaused
     UWorld* World = GetWorld();
     if (!World || World->IsPaused()) return;
-
+    if (TickableAddresses.Num() == 0) return; //If no active addresses.
     
-    for (auto& Pair : ReceiverMap)
+    for (auto It = TickableAddresses.CreateIterator(); It; ++It)
     {
-        for (FOSCT_ReceiverLink& Link : Pair.Value)
-        {
-            if (Link.bNeedsInterpolation && Link.HasValidOwner())
-            {
-                const float Speed = Link.Data.Tick.InterpolationSpeed;
-                // 1. Interpolation based on type.
-                switch (Link.Data.ModuleType)
-                {
-                case EOSCT_ModuleType::FLOAT:
-                    Link.CurrentValue = FMath::VInterpTo(Link.CurrentValue, Link.TargetValue, DeltaTime, Speed);
-                    IOSCT_Router::Execute_GET_Float_Tick(Link.GetOwner(), Link.Data, Link.CurrentValue.X);
-                    break;
-                case EOSCT_ModuleType::VEC2:
-                    Link.CurrentValue = FMath::VInterpTo(Link.CurrentValue, Link.TargetValue, DeltaTime, Speed);
-                    IOSCT_Router::Execute_GET_Vector2_Tick(Link.GetOwner(), Link.Data, FVector2D(Link.CurrentValue.X, Link.CurrentValue.Y));
-                case EOSCT_ModuleType::VEC3:
-                    Link.CurrentValue = FMath::VInterpTo(Link.CurrentValue, Link.TargetValue, DeltaTime, Speed);
-                    IOSCT_Router::Execute_GET_Vector3_Tick(Link.GetOwner(), Link.Data, Link.CurrentValue);
-                    break;
-                case EOSCT_ModuleType::ROTATION:
-                    Link.CurrentRotation = FMath::RInterpTo(Link.CurrentRotation, Link.TargetRotation, DeltaTime, Speed);
-                    IOSCT_Router::Execute_GET_Rotation_Tick(Link.GetOwner(), Link.Data, Link.CurrentRotation);
-                    break;
-                case EOSCT_ModuleType::COLOR:
-                    Link.CurrentColor = FMath::CInterpTo(Link.CurrentColor, Link.TargetColor, DeltaTime, Speed);
-                    IOSCT_Router::Execute_GET_Color_Tick(Link.GetOwner(), Link.Data, Link.CurrentColor);
-                    break;
-
-                case EOSCT_ModuleType::TRANSFORM:
-                    {
-                    Link.CurrentValue = FMath::VInterpTo(Link.CurrentValue, Link.TargetValue, DeltaTime, Speed);
-                    Link.CurrentRotation   = FMath::RInterpTo(Link.CurrentRotation, Link.TargetRotation, DeltaTime, Speed);
-                    Link.CurrentScale = FMath::VInterpTo(Link.CurrentScale, Link.TargetScale, DeltaTime, Speed);
-                    FTransform CurrentTransform(
-                        Link.CurrentRotation, 
-                        Link.CurrentValue,    
-                        Link.CurrentScale     
-                    );
-                    IOSCT_Router::Execute_GET_Transform_Tick(Link.GetOwner(), Link.Data, CurrentTransform);
-                    break;
-                    }
-                default: break;
-                }
-                if (CheckIfSettled(Link))
-                {
-                    // Sleep interpolation if the value is not changing...
-                    Link.bNeedsInterpolation = false;
-                }
-            }
-        }
-    }
-}
-bool UOSCT_Master::CheckIfSettled(const FOSCT_ReceiverLink& Link)
-{
-    switch (Link.Data.ModuleType)
-    {
-    case EOSCT_ModuleType::ROTATION:
-        return Link.CurrentRotation.Equals(Link.TargetRotation, 0.01f);
-
-    case EOSCT_ModuleType::COLOR:
-        // 0.001 in float is practically invisible in 8-bit color
-        return Link.CurrentColor.Equals(Link.TargetColor, 0.001f);
-
-    case EOSCT_ModuleType::TRANSFORM:
-        // A Transform is only settled if all three parts are settled
-        return Link.CurrentValue.Equals(Link.TargetValue, 0.001f) &&
-               Link.CurrentRotation.Equals(Link.TargetRotation, 0.01f) &&
-               Link.CurrentScale.Equals(Link.TargetScale, 0.001f);
-    default:
-        // Handles FLOAT, VEC2, VEC3
-        return Link.CurrentValue.Equals(Link.TargetValue, 0.001f);
+        FName Address = *It;
+        bool bAnyLinkStillMoving = false;
+        // Float
+        ProcessActiveLinksTick<FOSCT_FloatLink>(FloatLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_FloatLink& Link, const float& Val) {
+            IOSCT_Router::Execute_GET_Float_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_FloatPackLink>(FloatPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_FloatPackLink& Link, const TMap < FString, float >& Val) {
+            IOSCT_Router::Execute_GET_Float_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Vector 2
+        ProcessActiveLinksTick<FOSCT_Vector2Link>(Vec2Links, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector2Link& Link, const FVector2D& Val) {
+            IOSCT_Router::Execute_GET_Vector2_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_Vector2PackLink>(Vec2PackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector2PackLink& Link, const TMap < FString, FVector2D >& Val) {
+            IOSCT_Router::Execute_GET_Vector2_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Vector 3
+        ProcessActiveLinksTick<FOSCT_Vector3Link>(Vec3Links, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector3Link& Link, const FVector& Val) {
+            IOSCT_Router::Execute_GET_Vector3_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_Vector3PackLink>(Vec3PackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector3PackLink& Link, const TMap < FString, FVector >& Val) {
+            IOSCT_Router::Execute_GET_Vector3_Pack_Tick(Obj, Link.Data, Val);
+        });
+        // //Rotation
+        ProcessActiveLinksTick<FOSCT_RotationLink>(RotationLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_RotationLink& Link, const FRotator& Val) {
+            IOSCT_Router::Execute_GET_Rotation_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_RotationPackLink>(RotationPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_RotationPackLink& Link, const TMap < FString, FRotator >& Val) {
+            IOSCT_Router::Execute_GET_Rotation_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Color
+        ProcessActiveLinksTick<FOSCT_ColorLink>(ColorLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_ColorLink& Link, const FLinearColor& Val) {
+            IOSCT_Router::Execute_GET_Color_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_ColorPackLink>(ColorPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_ColorPackLink& Link, const TMap < FString, FLinearColor >& Val) {
+            IOSCT_Router::Execute_GET_Color_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Transform
+        ProcessActiveLinksTick<FOSCT_TransformLink>(TransformLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_TransformLink& Link, const FTransform& Val) {
+            IOSCT_Router::Execute_GET_Transform_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_TransformPackLink>(TransformPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_TransformPackLink& Link, const TMap < FString, FTransform >& Val) {
+            IOSCT_Router::Execute_GET_Transform_Pack_Tick(Obj, Link.Data, Val);
+        });
+        if (!bAnyLinkStillMoving) It.RemoveCurrent();
     }
 }
