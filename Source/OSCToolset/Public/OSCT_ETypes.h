@@ -60,7 +60,7 @@ enum class EOSCT_SenderType : uint8
 	FLOAT	UMETA(DisplayName = "Float"),
 	STRING	UMETA(DisplayName = "String"),
 };
-
+	
 USTRUCT(BlueprintType)
 struct FOSCT_Note
 {
@@ -74,6 +74,11 @@ struct FOSCT_Note
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "OSCToolset")
 	int32 Voices = 1;
+	
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("Pitch: %d Velocity: %d  Voices:%d"), Pitch, Velocity, Voices);
+	}
 };
 
 class OSCTOOLSET_API OSCT_ETypes
