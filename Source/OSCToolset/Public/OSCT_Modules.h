@@ -36,6 +36,9 @@ struct FOSCT_ReceiverTick
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick")
 	float InterpolationSpeed = 5.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick")
+	float Tolerance = 0.001f;
 };
 
 
@@ -116,7 +119,8 @@ struct FOSCT_Receiver
 };
 
 
-USTRUCT(BlueprintType)
+
+USTRUCT()
 struct FOSCT_ReceiverLink
 {
 	GENERATED_BODY()
@@ -125,7 +129,7 @@ struct FOSCT_ReceiverLink
 	UPROPERTY()
 	FOSCT_Receiver Data;
 	
-	float Tolerance = 0.001f;
+	bool bIsFirstFrame = false;
 	bool bNeedsInterpolation = false;
 	bool bInitialized = false;
 	
@@ -180,7 +184,11 @@ static auto IsNearlyEqual(const T& A, const T& B, float Tolerance) -> decltype(A
 static bool IsNearlyEqual(float A, float B, float Tolerance) {
 	return FMath::IsNearlyEqual(A, B, Tolerance);
 }
-
+// For Rotators
+static bool IsNearlyEqual(const FRotator& A, const FRotator& B, float Tolerance) {
+	// This handles the 0-360 wrapping correctly
+	return (A - B).GetNormalized().IsNearlyZero(Tolerance);
+}
 template<typename T>
 struct TOSCT_LinkBase
 {
@@ -220,6 +228,14 @@ struct TOSCT_PackLinkBase
 			{
 				Interp(Cur, Pair.Value, DeltaTime, Speed);
 				bIsCurrentlySettled = false;
+				if (IsNearlyEqual(Cur, Pair.Value, Tolerance))
+				{
+					Cur = Pair.Value; // Snap to exact target
+				}
+			}
+			else
+			{
+				Cur = Pair.Value;  // Already within tolerance, ensure it is exactly the target
 			}
 		}
 	}
