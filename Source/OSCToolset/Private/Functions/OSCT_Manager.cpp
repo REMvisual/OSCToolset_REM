@@ -1,20 +1,19 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 #include "Functions/OSCT_Manager.h"
+#include "Engine/GameInstance.h"
 #include "OSCT_Master.h"
 
 UOSCT_Master* UOSCT_Manager::GetMaster(const UObject* WorldContextObject)
 {
-	if (WorldContextObject)
-	{
-		if (UWorld* World = WorldContextObject->GetWorld())
-		{
-			if (UGameInstance* GI = World->GetGameInstance())
-			{
-				return GI->GetSubsystem<UOSCT_Master>();
-			}
-		}
-	}
-	return nullptr;
+    if (!WorldContextObject) return nullptr;
+
+    UWorld* World = WorldContextObject->GetWorld();
+    if (!World) return nullptr;
+
+    UGameInstance* GI = World->GetGameInstance();
+    if (!GI) return nullptr;
+
+    return GI->GetSubsystem<UOSCT_Master>();
 }
 
 void UOSCT_Manager::AddReceiver(UObject* WorldContextObject, FOSCT_Receiver Receiver, UObject* Owner)
