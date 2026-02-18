@@ -28,7 +28,7 @@ public:
 	void OnReceiverAdded(const FOSCT_Receiver& Receiver);
 	
 	UFUNCTION(BlueprintNativeEvent, Category = "OSCToolset|Base")
-	void OnReceiverInit(const FOSCT_Receiver& Receiver);
+	void OnReceiverInit(const FOSCT_Receiver& Receiver, const int32& MessageSize);
 	
 	UFUNCTION(BlueprintNativeEvent, Category = "OSCToolset|Base")
 	void OnReceiverRemoved(const FOSCT_Receiver& Receiver);
@@ -36,86 +36,86 @@ public:
 	//Receivers
 	
 	// Event
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Event")
 	void GET_Event(const FOSCT_Receiver& Receiver);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Event|Pack")
 	void GET_Event_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, bool>& Map);
 	
 	// Float
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Float")
 	void GET_Float(const FOSCT_Receiver& Receiver, const float& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Float")
 	void GET_Float_Tick(const FOSCT_Receiver& Receiver, const float& Value);
 	
-	UFUNCTION(BlueprintNativeEvent, Category = "OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category = "OSCToolset|Receivers|Float|Pack")
 	void GET_Float_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, float>& Map);
-	UFUNCTION(BlueprintNativeEvent, Category = "OSCToolset|Receivers|Packs|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category = "OSCToolset|Receivers|Float|Pack")
 	void GET_Float_Pack_Tick(const FOSCT_Receiver& Receiver, const TMap<FString, float>& Map);
 
 	//Vector 2
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector2")
 	void GET_Vector2(const FOSCT_Receiver& Receiver, const FVector2D& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector2")
 	void GET_Vector2_Tick(const FOSCT_Receiver& Receiver, const FVector2D& Value);
 	
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector2|Pack")
 	void GET_Vector2_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, FVector2D>& Map);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector2|Pack")
 	void GET_Vector2_Pack_Tick(const FOSCT_Receiver& Receiver, const TMap<FString, FVector2D>& Map);
 
 	//Vector 3
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector3")
 	void GET_Vector3(const FOSCT_Receiver& Receiver, const FVector& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector3")
 	void GET_Vector3_Tick(const FOSCT_Receiver& Receiver, const FVector& Value);
 	
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector3|Pack")
 	void GET_Vector3_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, FVector>& Map);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Vector3|Pack")
 	void GET_Vector3_Pack_Tick(const FOSCT_Receiver& Receiver, const TMap<FString, FVector>& Map);
 
 	//Rotation
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Rotation")
 	void GET_Rotation(const FOSCT_Receiver& Receiver, const FRotator& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Rotation")
 	void GET_Rotation_Tick(const FOSCT_Receiver& Receiver, const FRotator& Value);
 	
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Rotation|Pack")
 	void GET_Rotation_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, FRotator>& Map);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Rotation|Pack")
 	void GET_Rotation_Pack_Tick(const FOSCT_Receiver& Receiver, const TMap<FString, FRotator>& Map);
 
 	//Color
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Color")
 	void GET_Color(const FOSCT_Receiver& Receiver, const FLinearColor& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Color")
 	void GET_Color_Tick(const FOSCT_Receiver& Receiver, const FLinearColor& Value);
 
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Color|Pack")
 	void GET_Color_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, FLinearColor>& Map);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Color|Pack")
 	void GET_Color_Pack_Tick(const FOSCT_Receiver& Receiver, const TMap<FString, FLinearColor>& Map);
 
 	//Transform
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Transform")
 	void GET_Transform(const FOSCT_Receiver& Receiver, const FTransform& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Transform")
 	void GET_Transform_Tick(const FOSCT_Receiver& Receiver, const FTransform& Value);
 
 	
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Transform|Pack")
 	void GET_Transform_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, FTransform>& Map);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs|Tick")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Transform|Pack")
 	void GET_Transform_Pack_Tick(const FOSCT_Receiver& Receiver, const TMap<FString, FTransform>& Map);
 
 	//String
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|String")
 	void GET_String(const FOSCT_Receiver& Receiver, const FString& Value);
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Packs")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|String|Pack")
 	void GET_String_Pack(const FOSCT_Receiver& Receiver, const TArray<FString>& Map);
 	
 	//Notes
-	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers")
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Note")
 	void GET_Notes(const FOSCT_Receiver& Receiver, const FOSCT_Note& Value);
 	
 	
