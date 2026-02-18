@@ -79,14 +79,40 @@ struct FOSCT_Receiver
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
 	EOSCT_ModuleType ModuleType = EOSCT_ModuleType::FLOAT;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
+	UPROPERTY(
+		EditAnywhere, 
+		BlueprintReadWrite, 
+		Category = "OSCToolset",
+		meta=(
+			EditCondition = "ModuleType != EOSCT_ModuleType::NOTE", 
+			EditConditionHides))
 	bool Pack = false;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick")
+	UPROPERTY(
+		EditAnywhere, 
+		BlueprintReadWrite, 
+		Category = "OSCToolset",
+		meta=(
+			EditCondition = "ModuleType != EOSCT_ModuleType::EVENT && ModuleType != EOSCT_ModuleType::NOTE && ModuleType != EOSCT_ModuleType::STRING", 
+			EditConditionHides))
 	FOSCT_ReceiverTick Tick;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Debug")
 	FOSCT_ModuleDebug Debug;
+	
+	// Constructor to convert from Table Row
+	FOSCT_Receiver(const FOSCT_ReceiverRow& Row)
+	{
+		Address = Row.Address;
+		ModuleType = Row.ModuleType;
+		Pack = Row.Pack;
+		Tick = Row.Tick;
+		Debug = Row.Debug;
+		Role = EOSCT_Role::RECEIVER;
+	}
+
+	// Default constructor (required by GENERATED_BODY)
+	FOSCT_Receiver() {}
 };
 
 
