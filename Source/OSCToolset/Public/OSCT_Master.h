@@ -19,7 +19,6 @@
 
 #include "OSCT_Master.generated.h"
 
-// DECLARE_LOG_CATEGORY_EXTERN(OSCToolset, Log, All);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOSCTInit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOSCTShutdown);
@@ -43,30 +42,22 @@ public:
 	UOSCClient* OSCT_Client;
 
 	////// RECEIVERS
-	////// RECEIVERS
-	////// RECEIVERS
 	
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	UFUNCTION()
 	void AddReceiver(FOSCT_Receiver Receiver, UObject* Owner);
 
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	UFUNCTION()
 	void AddManyReceivers(TArray<FOSCT_Receiver> Receivers, UObject* Owner);
 	
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset", 
-		meta = (
-			RequiredAssetDataTag = "RowStructure=/Script/OSCToolset.FOSCT_Receiver",
-			DefaultToSelf = "Owner", 
-			HidePin = "Owner"))
+	UFUNCTION()
 	void AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner);
 	
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (DefaultToSelf = "Owner", HidePin = "Owner"))
+	UFUNCTION()
 	void RemoveReceiver(FOSCT_Receiver Module, UObject* Owner);
 	
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset")
+	UFUNCTION()
 	void RemoveAllReceivers();
 	
-	////// SENDERS
-	////// SENDERS
 	////// SENDERS
 	UFUNCTION()
 	bool SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner);
