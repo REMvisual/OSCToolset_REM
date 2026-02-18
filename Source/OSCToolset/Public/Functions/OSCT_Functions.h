@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Engine/Engine.h" //Required for GEngine
@@ -9,19 +11,45 @@
 
 #include "OSCT_Functions.generated.h"
 
+namespace OSCT_DebugString
+{
+	// Simple helpers for common OSC types
+	static FString ToString(const FString& S) { return S; }
+	static FString ToString(const FName& N)   { return N.ToString(); }
+	static FString ToString(int32 I)          { return FString::FromInt(I); }
+	static FString ToString(bool B)           { return B ? TEXT("True") : TEXT("False"); }
+	
+	
+	static FString ToString(float V)          { return FString::SanitizeFloat(V); }
+	static FString ToString(const FVector2D& V)  { return V.ToString(); }
+	static FString ToString(const FVector& V)  { return V.ToString(); }
+	static FString ToString(const FLinearColor& C) { return C.ToString(); }
+	static FString ToString(const FRotator& R) { return R.ToString(); }
+	static FString ToString(const FTransform& R) { return R.ToString(); }
+    static FString ToString(const FOSCT_Note& N) { return N.ToString(); }
+	
+	// For the Maps/Arrays that were causing trouble
+	template<typename T>
+	static FString ToString(const TArray<T>& A) { return FString::Printf(TEXT("Array of %d items"), A.Num()); }
+    
+	template<typename K, typename V>
+	static FString ToString(const TMap<K, V>& M) { return FString::Printf(TEXT("Pack of %d items"), M.Num()); }
+	
+	template<typename T>
+	static FString ToString(const T& Value) 
+	{ 
+		return TEXT("{Unknown Type}"); 
+	}
+}
 
-/**
- * 
- */
 UCLASS()
 class OSCTOOLSET_API UOSCT_Functions : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
-private:
+public:
 	static void DisplayDebug(const FOSCT_Receiver& Module, const FString& Message);
 	
-public:
 	/** Safely converts any Enum to a string without crashing the Editor */
 	template<typename T>
 	static FString GetEnumString(T EnumValue);
@@ -52,12 +80,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Networking")
 	static void SendSenderStateUpdate(UOSCClient* Client, const FOSCT_Sender& Data, UObject* Context, bool bIsConnecting);
 
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Debug")
-	static void DebugModule(const FOSCT_Receiver& Module);
 	
-	//TODO-Pass args instead of a Fstruct.
-	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Debug")
-	static void DebugReceiver(const FOSCT_ReceiverLink& Receiver);	
+	//Debug Template
+	template<typename TLink, typename TValue>
+	static void DebugReceiverLink(const TLink& Link, const TValue& Value)
+	{
+		if (!Link.Data.Debug.PrintOnLog && !Link.Data.Debug.PrintOnScreen) return;
+		
+		// Use our custom stringifier
+		FString ValueStr = OSCT_DebugString::ToString(Value);
+		
+		FString FullMessage = FString::Printf(TEXT("%s: %s"), 
+			*Link.Data.FormattedAddress, 
+			*ValueStr);
+
+		DisplayDebug(Link.Data, FullMessage);
+	}
 	
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Debug")
 	static FColor GetModuleDebugColor(const EOSCT_ModuleType& ModuleType);
