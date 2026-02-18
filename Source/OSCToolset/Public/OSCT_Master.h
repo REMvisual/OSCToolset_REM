@@ -249,13 +249,23 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 			{
 				if (L.bNeedsInterpolation && L.Owner.IsValid())
 				{
-					L.Interpolate(DeltaTime, L.Data.Tick.InterpolationSpeed, L.Tolerance);
-                
-					// We pass the whole Link 'L' so the interface has everything it needs
-					ExecuteFunc(L.Owner.Get(), L, L.CurrentValue);
-
-					if (L.IsSettled(L.Tolerance)) L.bNeedsInterpolation = false;
-					else bOutStillMoving = true;
+					// 1. Update values (The Snap happens inside here now)
+					L.Interpolate(DeltaTime, L.Data.Tick.InterpolationSpeed, L.Data.Tick.Tolerance);
+             
+					// 2. We check if the update caused it to settle
+					if (L.IsSettled(L.Data.Tick.Tolerance)) 
+					{
+						L.bNeedsInterpolation = false;
+						if (L.Data.Debug.PrintOnLog)
+						{
+							UE_LOG(OSCToolset, Warning, TEXT("The value has settled for %s"), *L.Data.Address)
+						}
+					}
+					else 
+					{
+						bOutStillMoving = true;
+						ExecuteFunc(L.Owner.Get(), L, L.CurrentValue);
+					}
 				}
 			}
 		}

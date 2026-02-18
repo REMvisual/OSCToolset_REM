@@ -682,7 +682,6 @@ void UOSCT_Master::Tick(float DeltaTime)
     UWorld* World = GetWorld();
     if (!World || World->IsPaused()) return;
     if (TickableAddresses.Num() == 0) return; //If no active addresses.
-    
     for (auto It = TickableAddresses.CreateIterator(); It; ++It)
     {
         FName Address = *It;
