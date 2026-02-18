@@ -33,6 +33,14 @@ void UOSCT_Manager::AddManyReceivers(UObject* WorldContextObject, TArray<FOSCT_R
 	}
 }
 
+void UOSCT_Manager::AddReceiversFromDataTable(UObject* WorldContextObject, UDataTable* InTable, UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->AddReceiversFromDataTable(InTable, Owner);
+	}
+}
+
 void UOSCT_Manager::RemoveReceiver(UObject* WorldContextObject, FOSCT_Receiver Receiver, UObject* Owner)
 {
 	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
@@ -40,6 +48,14 @@ void UOSCT_Manager::RemoveReceiver(UObject* WorldContextObject, FOSCT_Receiver R
 		Master->RemoveReceiver(Receiver, Owner);
 	}
 
+}
+
+void UOSCT_Manager::RemoveAllReceivers(UObject* WorldContextObject)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->RemoveAllReceivers();
+	}
 }
 
 void UOSCT_Manager::SendEvent(UObject* WorldContextObject, FOSCT_Sender& Sender, UObject* Owner)

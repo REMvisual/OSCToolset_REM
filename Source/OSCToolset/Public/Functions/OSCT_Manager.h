@@ -28,7 +28,13 @@ private:
 	static void AddManyReceivers(UObject* WorldContextObject, TArray<FOSCT_Receiver> Receivers, UObject* Owner);
 
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void AddReceiversFromDataTable(UObject* WorldContextObject, UDataTable* InTable, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
 	static void RemoveReceiver(UObject* WorldContextObject, FOSCT_Receiver Receiver, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset", meta = (WorldContext = "WorldContextObject"))
+	static void RemoveAllReceivers(UObject* WorldContextObject);
 	
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
 	static void SendEvent(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, UObject* Owner);
