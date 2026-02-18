@@ -257,11 +257,11 @@ void UOSCT_Master::init_OSCT_Master()
 
 void UOSCT_Master::InitializeOSC()
 {
-    FString Server_addr = SetLocalIPAddress(Settings->ServerAddress);
+    FString Server_addr = SetLocalIPAddress(Settings->ServerAddress, Settings->UseLocalIPV4);
     int Server_port= Settings->ServerPort;
     bool Multicast_loopback = Settings->MulticastLoopback;
 
-    FString Client_addr= SetLocalIPAddress(Settings->ClientAddress);
+    FString Client_addr= SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4);
     int Client_port = Settings->ClientPort;
 
     OSCT_Server = UOSCManager::CreateOSCServer(Server_addr, Server_port, Multicast_loopback, true, "OSCT_Server", this);
@@ -336,20 +336,21 @@ FString UOSCT_Master::GetLocalIPAddress()
     return FString();
 }
 
-FString UOSCT_Master::SetLocalIPAddress(FString InAddress, bool Log)
+FString UOSCT_Master::SetLocalIPAddress(FString InAddress, const bool UseLocalIPV4, bool Log)
 {
-    if (InAddress == "localhost" || InAddress == "127.0.0.1")
+    if (UseLocalIPV4)
     {
-        if (IPV4.IsEmpty())
+        if (InAddress == "localhost" || InAddress == "127.0.0.1")
         {
-            // In case IPV4 was not found we use localhost
-            if (Log) 
+            if (IPV4.IsEmpty())
             {
-                UE_LOG(OSCToolset, Error, TEXT("Address-> %s OSCT Master could not find an IPV4, using localhost (127.0.0.1)"), *InAddress);
+                // In case IPV4 was not found we use localhost
+                if (Log) 
+                {
+                    UE_LOG(OSCToolset, Error, TEXT("Address-> %s OSCT Master could not find an IPV4, using localhost (127.0.0.1)"), *InAddress);
+                }
+                return "127.0.0.1";
             }
-            return "127.0.0.1";
-        }
-        else {
             // If the address that is set is localhost, use the local IPV4. A fix for 5.5
             if (Log)
             {
@@ -358,16 +359,17 @@ FString UOSCT_Master::SetLocalIPAddress(FString InAddress, bool Log)
             return IPV4;
         }
     }
-    else {
-        // Otherwise use the selected address :^)
-        return InAddress;
-    }
+    // Otherwise use the selected address :^)
+    return InAddress;
 }
-
 
 void UOSCT_Master::LogSettings()
 {
-    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Address: %s | Client Port: %d"), *SetLocalIPAddress(Settings->ServerAddress, true), Settings->ServerPort, *SetLocalIPAddress(Settings->ClientAddress, true), Settings->ClientPort);
+    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Address: %s | Client Port: %d"), 
+        *SetLocalIPAddress(Settings->ServerAddress, Settings->UseLocalIPV4, true), 
+        Settings->ServerPort, 
+        *SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4, true), 
+        Settings->ClientPort);
 }
 
 void UOSCT_Master::ToggleOSCTMenu()

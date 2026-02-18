@@ -288,7 +288,7 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 
 	FString GetLocalIPAddress();
 
-	FString SetLocalIPAddress(FString InAddress, bool Log = false);
+	FString SetLocalIPAddress(FString InAddress, const bool UseLocalIPV4, bool Log = false);
 
 	UFUNCTION()
 	bool HandleCommands(const FOSCMessage& InMessage);

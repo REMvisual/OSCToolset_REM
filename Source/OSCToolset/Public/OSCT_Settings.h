@@ -33,4 +33,7 @@ public:
 
 	UPROPERTY(EditAnywhere, config, category = "OSCToolset|Client (Send)")
 	int ClientPort;
+	
+	UPROPERTY(EditAnywhere, config, category = "OSCToolset")
+	bool UseLocalIPV4;
 };

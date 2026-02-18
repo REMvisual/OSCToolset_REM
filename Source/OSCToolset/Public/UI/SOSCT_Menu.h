@@ -35,7 +35,9 @@ private:
 
 	TSharedPtr<SEditableTextBox> ClientAddressTextBox;
 	TSharedPtr<SSpinBox<int32>> ClientPortSpinBox;
-
+	
+	TSharedPtr<SCheckBox> UseLocalIPV4Box;
+	
 	//FReply OnSaveSettings();
 	FReply OnReinitializeOSCT();
 
@@ -45,4 +47,5 @@ private:
 
 	FString ClientAddress;
 	int32 ClientPort; 
+	bool UseLocalIPV4;
 };
