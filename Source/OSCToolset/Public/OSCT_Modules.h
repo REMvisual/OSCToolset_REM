@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "OSCT_ETypes.h"
 #include "OSCAddress.h"
+#include "Engine/DataTable.h"
 #include "OSCT_Modules.generated.h"
 
 USTRUCT(BlueprintType)
@@ -37,6 +38,29 @@ struct FOSCT_ReceiverTick
 	float InterpolationSpeed = 5.0f;
 };
 
+
+//Tables don't like condition hides from structs, so this is a mirror to create them.
+//There will be a function to convert the type to FOSCT_Receiver
+USTRUCT()
+struct FOSCT_ReceiverRow: public FTableRowBase
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
+	FString Address;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
+	EOSCT_ModuleType ModuleType = EOSCT_ModuleType::FLOAT;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset")
+	bool Pack = false;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Tick")
+	FOSCT_ReceiverTick Tick;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Debug")
+	FOSCT_ModuleDebug Debug;
+};
 
 USTRUCT(BlueprintType)
 struct FOSCT_Receiver
