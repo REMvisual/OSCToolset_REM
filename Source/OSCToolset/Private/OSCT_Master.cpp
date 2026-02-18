@@ -289,6 +289,8 @@ void UOSCT_Master::CleanupLinks()
     StringLinks.Empty();
     StringPackLinks.Empty();
     NoteLinks.Empty();
+    
+    TickableAddresses.Empty();
 }
 
 void UOSCT_Master::SendOSCTBaseMessage(FString Message)
