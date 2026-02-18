@@ -201,6 +201,39 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 		return LinkArray;
 	}
 	
+	template<typename TLink, typename TValue>
+	void RouteOSCMessage(
+		const FOSCMessage& Message,
+		TMap<FName, TArray<TLink>>& TargetMap,
+		TMap<FName, EOSCT_RouteType>& CacheMap,
+		FName AddressKey,
+		TFunction<bool(const FOSCMessage&, TValue&)> ParseFunc,
+		TFunction<void(UObject*, const FOSCT_Receiver&, const TValue&)> ExecFunc,
+		TFunction<void(UObject*, const FOSCT_Receiver&, const TValue&)> TickFunc = nullptr)
+		{
+			TValue ParsedValue;
+			if (ParseFunc(Message, ParsedValue))
+			{
+				if (auto* Links = UpdateAndPrune(TargetMap, CacheMap, AddressKey, ParsedValue))
+				{
+					for (TLink& Link : *Links)
+					{
+						UObject* Target = Link.Owner.Get();
+						if (!Target) continue;
+
+						ExecFunc(Target, Link.Data, ParsedValue);
+						UOSCT_Functions::DebugReceiverLink(Link, ParsedValue);
+						
+						if (TickFunc && Link.bIsFirstFrame)
+						{
+							TickFunc(Target, Link.Data, Link.CurrentValue);
+							Link.bIsFirstFrame = false; // Gate closed forever
+						}
+					}
+				}
+			}
+		}
+	
 	template<typename TLink>
 	void ProcessActiveLinksTick(
 		TMap<FName, 

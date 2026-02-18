@@ -585,293 +585,102 @@ void UOSCT_Master::RouteMessage(const FOSCMessage& InMessage, const FString& InA
         switch (*RouteTypePtr)
         {
         case EOSCT_RouteType::FLOAT:
-        {
-            float Val;
-            if (UOSCT_Parsing::TryGetFloat(InMessage, Val))
-            {
-                if (auto* Links = UpdateAndPrune(FloatLinks, AddressToType, AddressKey, Val))
-                {
-                    for (const FOSCT_FloatLink& Link : *Links)
-                    {
-                        IOSCT_Router::Execute_GET_Float(Link.Owner.Get(), Link.Data, Val);
-                        if (!Link.bNeedsInterpolation)
-                        { 
-                            //First message to Tick events on the Router.
-                            IOSCT_Router::Execute_GET_Float_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                        }
-                    }
-                }
-            }
-        break;
-        }
+            RouteOSCMessage<FOSCT_FloatLink, float>(InMessage, FloatLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetFloat,
+            &IOSCT_Router::Execute_GET_Float,
+            &IOSCT_Router::Execute_GET_Float_Tick);
+            break;
         case EOSCT_RouteType::EVENT:
-        {
-            if (auto* Links = UpdateAndPrune(EventLinks, AddressToType, AddressKey, false))
-            {
-                for (const FOSCT_EventLink& Link : *Links)
-                {
-                    IOSCT_Router::Execute_GET_Event(Link.GetOwner(), Link.Data);
-                }
-            }
-        break;
-        }
+            RouteOSCMessage<FOSCT_EventLink, bool>(InMessage, EventLinks, AddressToType, AddressKey,
+            [](const FOSCMessage& M, bool& Out) { Out = true; return true; },
+            [](UObject* Obj, const FOSCT_Receiver& D, bool V) { IOSCT_Router::Execute_GET_Event(Obj, D); });
+            break;
         case EOSCT_RouteType::VEC2:
-        {
-            FVector2D Val;
-            if (UOSCT_Parsing::TryGetVector2(InMessage, Val))
-            {
-                if (auto* Links = UpdateAndPrune(Vec2Links, AddressToType, AddressKey, Val))
-                {
-                    for (const FOSCT_Vector2Link& Link : *Links)
-                    {
-                        IOSCT_Router::Execute_GET_Vector2(Link.GetOwner(), Link.Data, Val);
-                    }
-                }
-            }
+            RouteOSCMessage<FOSCT_Vector2Link, FVector2D>(InMessage, Vec2Links, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector2,
+            &IOSCT_Router::Execute_GET_Vector2,
+            &IOSCT_Router::Execute_GET_Vector2_Tick);
             break;
-        }
         case EOSCT_RouteType::VEC3:
-            {
-                FVector Val;
-                if (UOSCT_Parsing::TryGetVector3(InMessage, Val))
-                {
-                    if (auto* Links = UpdateAndPrune(Vec3Links, AddressToType, AddressKey, Val))
-                    {
-                        for (const FOSCT_Vector3Link& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Vector3(Link.GetOwner(), Link.Data, Val);
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::ROTATION:
-            {
-                FRotator Val;
-                if (UOSCT_Parsing::TryGetRotation(InMessage, Val))
-                {
-                    if (auto* Links = UpdateAndPrune(RotationLinks, AddressToType, AddressKey, Val))
-                    {
-                        for (const FOSCT_RotationLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Rotation(Link.GetOwner(), Link.Data, Val);
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::COLOR:
-            {
-                FLinearColor Val;
-                if (UOSCT_Parsing::TryGetColor(InMessage, Val))
-                {
-                    if (auto* Links = UpdateAndPrune(ColorLinks, AddressToType, AddressKey, Val))
-                    {
-                        for (const FOSCT_ColorLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Color(Link.GetOwner(), Link.Data, Val);
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::TRANSFORM:
-            {
-                FTransform Val;
-                if (UOSCT_Parsing::TryGetTransform(InMessage, Val))
-                {
-                    if (auto* Links = UpdateAndPrune(TransformLinks, AddressToType, AddressKey, Val))
-                    {
-                        for (const FOSCT_TransformLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Transform(Link.GetOwner(), Link.Data, Val);
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::STRING:
-            {
-                FString Val;
-                if (UOSCT_Parsing::TryGetString(InMessage, Val))
-                {
-                    if (auto* Links = UpdateAndPrune(StringLinks, AddressToType, AddressKey, Val))
-                    {
-                        for (const FOSCT_StringLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_String(Link.GetOwner(), Link.Data, Val);
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::NOTE:
-            {
-                FOSCT_Note Val;
-                if (UOSCT_Parsing::TryGetNotes(InMessage, Val))
-                {
-                    if (auto* Links = UpdateAndPrune(NoteLinks, AddressToType, AddressKey, Val))
-                    {
-                        for (const FOSCT_NoteLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Notes(Link.GetOwner(), Link.Data, Val);
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::FLOAT_PACK:
-            {
-                TMap<FString, float> Map;
-                if (UOSCT_Parsing::TryGetFloatPack(InMessage, Map))
-                {
-                    if (auto * Links = UpdateAndPrune(FloatPackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_FloatPackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Float_Pack(Link.Owner.Get(), Link.Data, Map);
-                            if (!Link.bNeedsInterpolation)
-                            { 
-                                //First message to Tick events on the Router.
-                                IOSCT_Router::Execute_GET_Float_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::EVENT_PACK:
-            {
-                TMap<FString, bool> Map;
-                if (UOSCT_Parsing::TryGetEventPack(InMessage, Map))
-                {
-                    if (auto* Links = UpdateAndPrune(EventPackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_EventPackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Event_Pack(Link.Owner.Get(), Link.Data, Map);
-                            
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::VEC2_PACK:
-            {
-                TMap<FString, FVector2D> Map;
-                if (UOSCT_Parsing::TryGetVector2Pack(InMessage, Map))
-                {
-                    if (auto * Links = UpdateAndPrune(Vec2PackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_Vector2PackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Vector2_Pack(Link.Owner.Get(), Link.Data, Map);
-                            if (!Link.bNeedsInterpolation)
-                            { 
-                                //First message to Tick events on the Router.
-                                IOSCT_Router::Execute_GET_Vector2_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
-        case EOSCT_RouteType::VEC3_PACK:
-        {
-            TMap<FString, FVector> Map;
-            if (UOSCT_Parsing::TryGetVector3Pack(InMessage, Map))
-            {
-                if (auto * Links = UpdateAndPrune(Vec3PackLinks, AddressToType, AddressKey, Map))
-                {
-                    for (const FOSCT_Vector3PackLink& Link : *Links)
-                    {
-                        IOSCT_Router::Execute_GET_Vector3_Pack(Link.Owner.Get(), Link.Data, Map);
-                        if (!Link.bNeedsInterpolation)
-                        { 
-                            //First message to Tick events on the Router.
-                            IOSCT_Router::Execute_GET_Vector3_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                        }
-                    }
-                }
-            }
+            RouteOSCMessage<FOSCT_Vector3Link, FVector>(InMessage, Vec3Links, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector3,
+            &IOSCT_Router::Execute_GET_Vector3,
+            &IOSCT_Router::Execute_GET_Vector3_Tick);
             break;
-        }
+        case EOSCT_RouteType::ROTATION:
+            RouteOSCMessage<FOSCT_RotationLink, FRotator>(InMessage, RotationLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetRotation,
+            &IOSCT_Router::Execute_GET_Rotation,
+            &IOSCT_Router::Execute_GET_Rotation_Tick);
+            break;
+        case EOSCT_RouteType::COLOR:
+            RouteOSCMessage<FOSCT_ColorLink, FLinearColor>(InMessage, ColorLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetColor,
+            &IOSCT_Router::Execute_GET_Color,
+            &IOSCT_Router::Execute_GET_Color_Tick);
+            break;
+        case EOSCT_RouteType::TRANSFORM:
+            RouteOSCMessage<FOSCT_TransformLink, FTransform>(InMessage, TransformLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetTransform,
+            &IOSCT_Router::Execute_GET_Transform,
+            &IOSCT_Router::Execute_GET_Transform_Tick);
+            break;
+        case EOSCT_RouteType::STRING:
+            RouteOSCMessage<FOSCT_StringLink, FString>(InMessage, StringLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetString,
+            &IOSCT_Router::Execute_GET_String);
+            break;
+        case EOSCT_RouteType::NOTE:
+            RouteOSCMessage<FOSCT_NoteLink, FOSCT_Note>(InMessage, NoteLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetNotes,
+            &IOSCT_Router::Execute_GET_Notes);
+            break;
+        case EOSCT_RouteType::FLOAT_PACK:
+            RouteOSCMessage<FOSCT_FloatPackLink, TMap<FString, float>>(InMessage, FloatPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetFloatPack,
+            &IOSCT_Router::Execute_GET_Float_Pack,
+            &IOSCT_Router::Execute_GET_Float_Pack_Tick);
+            break;
+        case EOSCT_RouteType::EVENT_PACK:
+            RouteOSCMessage<FOSCT_EventPackLink, TMap<FString, bool>>(InMessage, EventPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetEventPack,
+            &IOSCT_Router::Execute_GET_Event_Pack);
+            break;
+        case EOSCT_RouteType::VEC2_PACK:
+            RouteOSCMessage<FOSCT_Vector2PackLink, TMap<FString, FVector2D>>(InMessage, Vec2PackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector2Pack,
+            &IOSCT_Router::Execute_GET_Vector2_Pack,
+            &IOSCT_Router::Execute_GET_Vector2_Pack_Tick);
+            break;
+        case EOSCT_RouteType::VEC3_PACK:
+            RouteOSCMessage<FOSCT_Vector3PackLink, TMap<FString, FVector>>(InMessage, Vec3PackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector3Pack,
+            &IOSCT_Router::Execute_GET_Vector3_Pack,
+            &IOSCT_Router::Execute_GET_Vector3_Pack_Tick);
+            break;
         case EOSCT_RouteType::ROTATION_PACK:
-            {
-                TMap<FString, FRotator> Map;
-                if (UOSCT_Parsing::TryGetRotationPack(InMessage, Map))
-                {
-                    if (auto * Links = UpdateAndPrune(RotationPackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_RotationPackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Rotation_Pack(Link.Owner.Get(), Link.Data, Map);
-                            if (!Link.bNeedsInterpolation)
-                            { 
-                                //First message to Tick events on the Router.
-                                IOSCT_Router::Execute_GET_Rotation_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
+            RouteOSCMessage<FOSCT_RotationPackLink, TMap<FString, FRotator>>(InMessage, RotationPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetRotationPack,
+            &IOSCT_Router::Execute_GET_Rotation_Pack,
+            &IOSCT_Router::Execute_GET_Rotation_Pack_Tick);
+            break;
         case EOSCT_RouteType::COLOR_PACK:
-            {
-                TMap<FString, FLinearColor> Map;
-                if (UOSCT_Parsing::TryGetColorPack(InMessage, Map))
-                {
-                    if (auto * Links = UpdateAndPrune(ColorPackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_ColorPackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Color_Pack(Link.Owner.Get(), Link.Data, Map);
-                            if (!Link.bNeedsInterpolation)
-                            { 
-                                //First message to Tick events on the Router.
-                                IOSCT_Router::Execute_GET_Color_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
+            RouteOSCMessage<FOSCT_ColorPackLink, TMap<FString, FLinearColor>>(InMessage, ColorPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetColorPack,
+            &IOSCT_Router::Execute_GET_Color_Pack,
+            &IOSCT_Router::Execute_GET_Color_Pack_Tick);
+            break;
         case EOSCT_RouteType::TRANSFORM_PACK:
-            {
-                TMap<FString, FTransform> Map;
-                
-                if (UOSCT_Parsing::TryGetTransformPack(InMessage, Map))
-                {
-                    if (auto * Links = UpdateAndPrune(TransformPackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_TransformPackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_Transform_Pack(Link.Owner.Get(), Link.Data, Map);
-                            if (!Link.bNeedsInterpolation)
-                            { 
-                                //First message to Tick events on the Router.
-                                IOSCT_Router::Execute_GET_Transform_Pack_Tick(Link.Owner.Get(), Link.Data, Link.CurrentValue);
-                            }
-                        }
-                    }
-                }
-                break;
-            }
+            RouteOSCMessage<FOSCT_TransformPackLink, TMap<FString, FTransform>>(InMessage, TransformPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetTransformPack,
+            &IOSCT_Router::Execute_GET_Transform_Pack,
+            &IOSCT_Router::Execute_GET_Transform_Pack_Tick);
+            break;          
         case EOSCT_RouteType::STRING_PACK:
-            {
-                TArray<FString> Map;
-                if (UOSCT_Parsing::TryGetStringPack(InMessage, Map))
-                {
-                    if (auto * Links = UpdateAndPrune(StringPackLinks, AddressToType, AddressKey, Map))
-                    {
-                        for (const FOSCT_StringPackLink& Link : *Links)
-                        {
-                            IOSCT_Router::Execute_GET_String_Pack(Link.Owner.Get(), Link.Data, Map);
-                        }
-                    }
-                }
-                break;
-            }
+            RouteOSCMessage<FOSCT_StringPackLink, TArray<FString>>(InMessage, StringPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetStringPack,
+            &IOSCT_Router::Execute_GET_String_Pack);
+            break;                    
         default:
             UE_LOG(OSCToolset, Warning, TEXT("Received a message not well formatted from a Receiver: %s"), *Address);
             break;
