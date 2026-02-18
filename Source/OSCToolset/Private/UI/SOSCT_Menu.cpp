@@ -29,7 +29,9 @@ void SOSCT_Menu::Construct(const FArguments& InArgs)
 
 	ClientAddress = Config->ClientAddress;
 	ClientPort = Config->ClientPort;
-
+    
+    UseLocalIPV4 = Config->UseLocalIPV4;
+    
     if (GEngine && GEngine->GameViewport)
     {
         const int32 ui_padding = 5;
@@ -158,6 +160,27 @@ void SOSCT_Menu::Construct(const FArguments& InArgs)
                                     ]
                                     + SVerticalBox::Slot()
                                     .AutoHeight()
+                                    .Padding(ui_padding)
+                                    [
+                                        SNew(STextBlock)
+                                            .Text(FText::FromString("Use Local IPV4"))
+                                    ]
+                                    + SVerticalBox::Slot()
+                                    .AutoHeight()
+                                    .Padding(ui_padding)
+                                    [
+                                        SAssignNew(UseLocalIPV4Box, SCheckBox)
+                                            .OnCheckStateChanged_Lambda([this](ECheckBoxState NewState)
+                                                {
+                                                    UseLocalIPV4 = (NewState == ECheckBoxState::Checked);
+                                                })
+                                            .IsChecked_Lambda([this]() -> ECheckBoxState
+                                                {
+                                                    return UseLocalIPV4 ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+                                                })
+                                    ]
+                                    + SVerticalBox::Slot()
+                                    .AutoHeight()
                                     .Padding(FMargin(ui_padding, 25, ui_padding, ui_padding))
                                     .HAlign(HAlign_Fill)
                                     [
@@ -182,6 +205,8 @@ void SOSCT_Menu::SaveSettings()
 
     MutableConfig->ClientAddress = ClientAddressTextBox->GetText().ToString();
     MutableConfig->ClientPort = ClientPortSpinBox->GetValue();
+    
+    MutableConfig->UseLocalIPV4 = (UseLocalIPV4Box->GetCheckedState() == ECheckBoxState::Checked);
     
     MutableConfig->SaveConfig();
 }

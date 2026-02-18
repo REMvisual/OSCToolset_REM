@@ -1,11 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "OSCToolset.h"
+#include "OSCToolsetLog.h"
 #include "Modules/ModuleManager.h"
 #include "Developer/Settings/Public/ISettingsModule.h"
 #include "OSCT_Settings.h"
 
 #define LOCTEXT_NAMESPACE "FOSCToolsetModule"
+DEFINE_LOG_CATEGORY(OSCToolset);
 
 void FOSCToolsetModule::StartupModule()
 {

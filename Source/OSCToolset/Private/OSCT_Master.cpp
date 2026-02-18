@@ -1,15 +1,18 @@
 ﻿#include "OSCT_Master.h"
+
 #include "OSCManager.h"
+#include "OSCT_Modules.h"
+#include "Interfaces/OSCT_Router.h"
+#include "OSCToolsetLog.h"
+#include "Functions/OSCT_Functions.h"
+#include "Functions/OSCT_Parsing.h"
 
 #include "OSCT_Settings.h"
 #include "UI/SOSCT_Menu.h"
-#include "Engine/Engine.h"
 #include "Widgets/SWeakWidget.h"
 
-#include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetRegistry/AssetData.h"
 
-#include "Sockets.h"
 #include "SocketSubsystem.h"
 #include "IPAddress.h"
 
@@ -20,7 +23,195 @@
 
 #include "GameFramework/PlayerController.h" // Required for APlayerController
 
-#include "Kismet/KismetStringLibrary.h"
+
+void UOSCT_Master::AddReceiver(FOSCT_Receiver Receiver, UObject* Owner)
+{
+    if (!Owner) return;
+    
+    if (UOSCT_Functions::FormatAddress(
+        Receiver.Role,
+        Receiver.ModuleType,
+        Receiver.Pack,
+        Receiver.Address,
+        Receiver.FormattedAddress))
+    {
+        FName AddressKey = FName(*Receiver.FormattedAddress);
+        if (!Owner->Implements<UOSCT_Router>())
+        {
+            UE_LOG(OSCToolset, Warning, TEXT("%s needs to implement OSCT_Router interface. Trying to receive address: %s"), 
+                *Owner->GetName(), *Receiver.FormattedAddress);
+            return;
+        }
+
+        switch (Receiver.ModuleType)
+        {
+        case EOSCT_ModuleType::EVENT:
+            if (Receiver.Pack) AddReceiverLink(EventPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(EventLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::FLOAT:
+            if (Receiver.Pack) AddReceiverLink(FloatPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(FloatLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::VEC2:
+            if (Receiver.Pack) AddReceiverLink(Vec2PackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(Vec2Links, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::VEC3:
+            if (Receiver.Pack) AddReceiverLink(Vec3PackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(Vec3Links, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::ROTATION:
+            if (Receiver.Pack) AddReceiverLink(RotationPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(RotationLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::COLOR:
+            if (Receiver.Pack) AddReceiverLink(ColorPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(ColorLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::TRANSFORM:
+            if (Receiver.Pack) AddReceiverLink(TransformPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(TransformLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::STRING:
+            if (Receiver.Pack) AddReceiverLink(StringPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(StringLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::NOTE:
+            AddReceiverLink(NoteLinks, AddressKey, Receiver, Owner);
+            break;
+        default:
+            break;
+        }
+        IOSCT_Router::Execute_OnReceiverAdded(Owner, Receiver);
+        UOSCT_Functions::SendReceiverStateUpdate(OSCT_Client, Receiver, Owner, true);
+        
+        UE_LOG(OSCToolset, Log, TEXT("Added OSCT %s: %s to Owner: %s"), 
+            *UOSCT_Functions::GetEnumString(Receiver.Role), *Receiver.FormattedAddress, *Owner->GetName());    
+    }
+    else
+    {
+        // ERROR: This is where you log it!
+        UE_LOG(OSCToolset, Error, TEXT("OSCT_Master: Failed to add module from %s. Address or Prefix is missing."), 
+            *Owner->GetName());
+    }
+}
+
+void UOSCT_Master::AddManyReceivers(TArray<FOSCT_Receiver> Receivers, UObject* Owner)
+{
+    for (const FOSCT_Receiver Module : Receivers)
+    {
+        AddReceiver(Module, Owner);
+    }
+}
+
+void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner)
+{
+    if (!InTable)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("OSCT_Master: Register attempted with null table."));
+        return;
+    }
+
+    // Ensure the table uses our struct
+    if (InTable->RowStruct->IsChildOf(FOSCT_ReceiverRow::StaticStruct()))
+    {
+        static const FString ContextString(TEXT("OSCT Receiver Rows"));
+        TArray<FOSCT_ReceiverRow*> Rows;
+        InTable->GetAllRows<FOSCT_ReceiverRow>(ContextString, Rows);
+        
+        for (FOSCT_ReceiverRow* RowData: Rows)
+        {
+            if (RowData)
+            {
+                FOSCT_Receiver NewReceiver(*RowData);
+                AddReceiver(NewReceiver, Owner);
+            }
+        }
+    }
+}
+
+void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Module, UObject* Owner)
+{
+    if (!Owner) return;
+    if (UOSCT_Functions::FormatAddress(
+        Module.Role,
+        Module.ModuleType,
+        Module.Pack,
+        Module.Address,
+        Module.FormattedAddress))
+    {
+        FName AddressKey = FName(*Module.FormattedAddress);
+        if (const EOSCT_RouteType* RouteTypePtr = AddressToType.Find(AddressKey))
+        {
+            switch (*RouteTypePtr)
+            {
+            case EOSCT_RouteType::EVENT:
+                RemoveReceiverLink(EventLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::EVENT_PACK:
+                RemoveReceiverLink(EventPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::FLOAT:
+                RemoveReceiverLink(FloatLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::FLOAT_PACK:
+                RemoveReceiverLink(FloatPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::VEC2:
+                RemoveReceiverLink(Vec2Links, AddressToType, AddressKey, Owner);
+                break;;
+            case EOSCT_RouteType::VEC2_PACK:
+                RemoveReceiverLink(Vec2PackLinks, AddressToType, AddressKey, Owner);
+                break;;
+            case EOSCT_RouteType::VEC3:
+                RemoveReceiverLink(Vec3Links, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::VEC3_PACK:
+                RemoveReceiverLink(Vec3PackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::ROTATION:
+                RemoveReceiverLink(RotationLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::ROTATION_PACK:
+                RemoveReceiverLink(RotationPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::COLOR:
+                RemoveReceiverLink(ColorLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::COLOR_PACK:
+                RemoveReceiverLink(ColorPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::TRANSFORM:
+                RemoveReceiverLink(TransformLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::TRANSFORM_PACK:
+                RemoveReceiverLink(TransformPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::STRING:
+                RemoveReceiverLink(StringLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::STRING_PACK:
+                RemoveReceiverLink(StringPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::NOTE:
+                RemoveReceiverLink(NoteLinks, AddressToType, AddressKey, Owner);
+                break;
+            default:
+                UE_LOG(OSCToolset, Warning, TEXT("Did not implement removing the receiver for this type: %s"), *Module.FormattedAddress);
+                break;
+            }
+            //Maybe send the disconnected module state update?
+            UE_LOG(OSCToolset, Log, TEXT("Unregistered OSCT Receiver: %s"), *Module.FormattedAddress);
+        }
+    }
+}
+
+void UOSCT_Master::RemoveAllReceivers()
+{
+    CleanupLinks();    
+    UE_LOG(OSCToolset, Log, TEXT("Removed all receivers."));
+}
 
 void UOSCT_Master::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -50,11 +241,11 @@ void UOSCT_Master::init_OSCT_Master()
 
 void UOSCT_Master::InitializeOSC()
 {
-    FString Server_addr = SetLocalIPAddress(Settings->ServerAddress);
+    FString Server_addr = SetLocalIPAddress(Settings->ServerAddress, Settings->UseLocalIPV4);
     int Server_port= Settings->ServerPort;
     bool Multicast_loopback = Settings->MulticastLoopback;
 
-    FString Client_addr= SetLocalIPAddress(Settings->ClientAddress);
+    FString Client_addr= SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4);
     int Client_port = Settings->ClientPort;
 
     OSCT_Server = UOSCManager::CreateOSCServer(Server_addr, Server_port, Multicast_loopback, true, "OSCT_Server", this);
@@ -63,7 +254,7 @@ void UOSCT_Master::InitializeOSC()
     {
         SendOSCTBaseMessage(OSCT_Init_addr);
         UE_LOG(OSCToolset, Log, TEXT("Send OSCT Master Init message"));
-        OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::SetCommands);
+        OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::RouteMessage);
     }
     if (OSCT_Client != nullptr)
     {
@@ -74,8 +265,32 @@ void UOSCT_Master::InitializeOSC()
 
 void UOSCT_Master::OnLevelChanged(const FString& LevelName)
 {
+    // RemoveAllReceivers(); //Make sure the listeners are gone before a new level is loaded.
     UE_LOG(OSCToolset, Log, TEXT("OnLevelChanged: %s"), *LevelName);
     SendOSCTBaseMessage(OSCT_OnLevelChanged_addr);
+}
+
+void UOSCT_Master::CleanupLinks()
+{
+    EventLinks.Empty();
+    EventPackLinks.Empty();
+    FloatLinks.Empty();
+    FloatPackLinks.Empty();
+    Vec2Links.Empty();
+    Vec2PackLinks.Empty();
+    Vec3Links.Empty();
+    Vec3PackLinks.Empty();
+    RotationLinks.Empty();
+    RotationPackLinks.Empty();
+    ColorLinks.Empty();
+    ColorPackLinks.Empty();
+    TransformLinks.Empty();
+    TransformPackLinks.Empty();
+    StringLinks.Empty();
+    StringPackLinks.Empty();
+    NoteLinks.Empty();
+    
+    TickableAddresses.Empty();
 }
 
 void UOSCT_Master::SendOSCTBaseMessage(FString Message)
@@ -107,20 +322,21 @@ FString UOSCT_Master::GetLocalIPAddress()
     return FString();
 }
 
-FString UOSCT_Master::SetLocalIPAddress(FString InAddress, bool Log)
+FString UOSCT_Master::SetLocalIPAddress(FString InAddress, const bool UseLocalIPV4, bool Log)
 {
-    if (InAddress == "localhost" || InAddress == "127.0.0.1")
+    if (UseLocalIPV4)
     {
-        if (IPV4.IsEmpty())
+        if (InAddress == "localhost" || InAddress == "127.0.0.1")
         {
-            // In case IPV4 was not found we use localhost
-            if (Log) 
+            if (IPV4.IsEmpty())
             {
-                UE_LOG(OSCToolset, Error, TEXT("Address-> %s OSCT Master could not find an IPV4, using localhost (127.0.0.1)"), *InAddress);
+                // In case IPV4 was not found we use localhost
+                if (Log) 
+                {
+                    UE_LOG(OSCToolset, Error, TEXT("Address-> %s OSCT Master could not find an IPV4, using localhost (127.0.0.1)"), *InAddress);
+                }
+                return "127.0.0.1";
             }
-            return "127.0.0.1";
-        }
-        else {
             // If the address that is set is localhost, use the local IPV4. A fix for 5.5
             if (Log)
             {
@@ -129,37 +345,17 @@ FString UOSCT_Master::SetLocalIPAddress(FString InAddress, bool Log)
             return IPV4;
         }
     }
-    else {
-        // Otherwise use the selected address :^)
-        return InAddress;
-    }
-}
-
-void UOSCT_Master::SetCommands(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
-{
-    APlayerController* PC = GetWorld()->GetFirstPlayerController();
-
-    FString cmd_addr = OSCT_Base_addr + "R/CMD";
-
-    FString msg = UOSCManager::GetOSCAddressFullPath(UOSCManager::GetOSCMessageAddress(InMessage));
-
-    if (UKismetStringLibrary::EqualEqual_StrStr(cmd_addr, msg))
-    {
-        //Once we checked if the Module Formatted address equals exactly to the incoming address, we can call GET_Message.
-        if (PC)
-        {
-            FString cmd = "";
-            UOSCManager::GetString(InMessage, 0, cmd);
-            UE_LOG(LogTemp, Log, TEXT("Set command fixed rate: %s cmd: %s"), *msg, *cmd);
-            PC->ConsoleCommand(cmd, true);
-        }
-    }
-
+    // Otherwise use the selected address :^)
+    return InAddress;
 }
 
 void UOSCT_Master::LogSettings()
 {
-    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Addresss: %s | Client Port: %d"), *SetLocalIPAddress(Settings->ServerAddress, true), Settings->ServerPort, *SetLocalIPAddress(Settings->ClientAddress, true), Settings->ClientPort);
+    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Address: %s | Client Port: %d"), 
+        *SetLocalIPAddress(Settings->ServerAddress, Settings->UseLocalIPV4, true), 
+        Settings->ServerPort, 
+        *SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4, true), 
+        Settings->ClientPort);
 }
 
 void UOSCT_Master::ToggleOSCTMenu()
@@ -180,7 +376,7 @@ void UOSCT_Master::ToggleOSCTMenu()
             OSCTMenu->OnReInitOSCT.BindLambda([this]()
                 {
                     // Handle re-initialization logic here
-                    reinit_OSCT_Master(); // Replace with your actual re-init function
+                    reinit_OSCT_Master();
                 });
 
             if (PlayerController) {
@@ -214,39 +410,40 @@ void UOSCT_Master::Deinitialize()
 
     Super::Deinitialize();
     // Clean up any resources here
-
+    CleanupLinks();
     FCoreUObjectDelegates::PreLoadMap.RemoveAll(this); //Cleanup On Level Loaded Static Delegate.
-
 }
 
 void UOSCT_Master::shutdown_OSCT_Master()
 {
+    // RemoveAllReceivers();
+    
     OnShutdownOSCT.Broadcast();
 
     if (IsValid(OSCT_Client))
     {
-        FOSCAddress addr = UOSCManager::ConvertStringToOSCAddress(OSCT_Shutdown_addr);
-        if (addr.GetFullPath().IsEmpty())
+        FOSCAddress Addr = UOSCManager::ConvertStringToOSCAddress(OSCT_Shutdown_addr);
+        
+        // Always check if the address is valid before sending
+        if (!Addr.GetFullPath().IsEmpty())
         {
-            UE_LOG(OSCToolset, Error, TEXT("Invalid OSC Address: %s"), *OSCT_Shutdown_addr);
-            return;
+            FOSCMessage Msg;
+            UOSCManager::SetOSCMessageAddress(Msg, Addr);
+            
+            UOSCManager::AddString(Msg, TEXT("OSCT Shutdown"));
+
+            OSCT_Client->SendOSCMessage(Msg);
         }
 
-        FOSCMessage msg;
-        msg = UOSCManager::SetOSCMessageAddress(msg, addr);
-
-        OSCT_Client->SendOSCMessage(msg);
-        OSCT_Client->ConditionalBeginDestroy(); // Proper cleanup
+        // Do NOT call ConditionalBeginDestroy(). 
+        // Just null it; the Subsystem's death will handle the rest.
         OSCT_Client = nullptr;
-    }
-    else
-    {
-        UE_LOG(OSCToolset, Error, TEXT("OSCT_Client is already invalid."));
     }
 
     if (IsValid(OSCT_Server))
     {
-        OSCT_Server->ConditionalBeginDestroy();
+        // Stop listening immediately
+        OSCT_Server->OnOscMessageReceived.RemoveAll(this);
         OSCT_Server = nullptr;
     }
 
@@ -256,7 +453,293 @@ void UOSCT_Master::shutdown_OSCT_Master()
 void UOSCT_Master::reinit_OSCT_Master()
 {
     UE_LOG(OSCToolset, Log, TEXT("Start Re-Init the OSCT Master."));
-
+    UE_LOG(OSCToolset, Log, TEXT("Total unique receivers in Map: %d"), ReceiverMap.Num());
     shutdown_OSCT_Master(); //First shutdown and clear
     init_OSCT_Master(); //Then init the OSCT Master again
+    
+    ReSendAllReceiversStateUpdate(); //For manual reset, we need to call the update.
+}
+
+void UOSCT_Master::ReSendAllReceiversStateUpdate()
+{
+    //Resend the module connected for each added receiver:
+    for (auto& Pair : ReceiverMap)
+    {
+        // Pair.Key is the FName
+        // Pair.Value is the TArray<FOSCT_ReceiverLink>
+        for (FOSCT_ReceiverLink& Link : Pair.Value)
+        {
+            // Example: UE_LOG(LogTemp, Log, TEXT("Key: %s | Link Data: %s"), *Pair.Key.ToString(), *Link.SomeProperty);
+            UOSCT_Functions::SendReceiverStateUpdate(OSCT_Client, Link.Data, Link.GetOwner(), true);
+        }
+    }
+
+}
+
+bool UOSCT_Master::SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner)
+{
+    if (Sender.FormattedAddress.IsEmpty())
+    {
+        UOSCT_Functions::FormatAddress(
+            Sender.Role, 
+            ModuleType,
+            false,
+            Sender.Address,
+            Sender.FormattedAddress);
+        
+        Sender.CachedFullAddress = UOSCManager::ConvertStringToOSCAddress(Sender.FormattedAddress);
+        Sender.Type = UOSCT_Functions::ConvertModuleTypeToSenderType(ModuleType);
+        UE_LOG(OSCToolset, Log, TEXT("Added a new sender? %s"), *Sender.FormattedAddress)
+        UOSCT_Functions::SendSenderStateUpdate(OSCT_Client, Sender, Owner, true);
+        return true;
+    } 
+    return false;
+}
+
+void UOSCT_Master::Send_Event(FOSCT_Sender& Sender, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::EVENT, Owner);
+    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        float GameTime = GetWorld()->GetRealTimeSeconds();
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, GameTime);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        OSCT_Client->SendOSCMessage(Msg);
+    }
+}
+
+void UOSCT_Master::Send_Float(FOSCT_Sender& Sender, const float Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::FLOAT, Owner);
+    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        OSCT_Client->SendOSCMessage(Msg);
+    }
+}
+
+void UOSCT_Master::Send_String(FOSCT_Sender& Sender, const FString& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::STRING, Owner);
+    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddString(Msg, Value);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        OSCT_Client->SendOSCMessage(Msg);
+    }
+}
+
+bool UOSCT_Master::HandleCommands(const FOSCMessage& InMessage)
+{
+    FOSCAddress Addr = UOSCManager::GetOSCMessageAddress(InMessage);
+    FString Path = UOSCManager::GetOSCAddressFullPath(Addr);
+    
+    // Check if this message is actually a command for us
+    FString TargetCmdPath = OSCT_Base_addr + "R/CMD";
+    if (!Path.Equals(TargetCmdPath))
+    {
+        return false; // Not a command message
+    }
+
+    // It is a command! Proceed with execution
+    APlayerController* PC = GetWorld()->GetFirstPlayerController();
+    if (PC)
+    {
+        FString Cmd = "";
+        if (UOSCManager::GetString(InMessage, 0, Cmd))
+        {
+            UE_LOG(OSCToolset, Log, TEXT("Executing Command: %s"), *Cmd);
+            PC->ConsoleCommand(Cmd, true);
+        }
+    }
+    return true; // Message handled
+}
+
+
+void UOSCT_Master::RouteMessage(const FOSCMessage& InMessage, const FString& InAddress, int32 InPort)
+{
+
+    FString Address = UOSCManager::GetOSCAddressFullPath(UOSCManager::GetOSCMessageAddress(InMessage));
+    FName AddressKey = FName(*Address);
+    
+    if (const EOSCT_RouteType* RouteTypePtr = AddressToType.Find(AddressKey))
+    {
+        switch (*RouteTypePtr)
+        {
+        case EOSCT_RouteType::FLOAT:
+            RouteOSCMessage<FOSCT_FloatLink, float>(InMessage, FloatLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetFloat,
+            &IOSCT_Router::Execute_GET_Float,
+            &IOSCT_Router::Execute_GET_Float_Tick);
+            break;
+        case EOSCT_RouteType::EVENT:
+            RouteOSCMessage<FOSCT_EventLink, bool>(InMessage, EventLinks, AddressToType, AddressKey,
+            [](const FOSCMessage& M, bool& Out) { Out = true; return true; },
+            [](UObject* Obj, const FOSCT_Receiver& D, bool V) { IOSCT_Router::Execute_GET_Event(Obj, D); });
+            break;
+        case EOSCT_RouteType::VEC2:
+            RouteOSCMessage<FOSCT_Vector2Link, FVector2D>(InMessage, Vec2Links, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector2,
+            &IOSCT_Router::Execute_GET_Vector2,
+            &IOSCT_Router::Execute_GET_Vector2_Tick);
+            break;
+        case EOSCT_RouteType::VEC3:
+            RouteOSCMessage<FOSCT_Vector3Link, FVector>(InMessage, Vec3Links, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector3,
+            &IOSCT_Router::Execute_GET_Vector3,
+            &IOSCT_Router::Execute_GET_Vector3_Tick);
+            break;
+        case EOSCT_RouteType::ROTATION:
+            RouteOSCMessage<FOSCT_RotationLink, FRotator>(InMessage, RotationLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetRotation,
+            &IOSCT_Router::Execute_GET_Rotation,
+            &IOSCT_Router::Execute_GET_Rotation_Tick);
+            break;
+        case EOSCT_RouteType::COLOR:
+            RouteOSCMessage<FOSCT_ColorLink, FLinearColor>(InMessage, ColorLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetColor,
+            &IOSCT_Router::Execute_GET_Color,
+            &IOSCT_Router::Execute_GET_Color_Tick);
+            break;
+        case EOSCT_RouteType::TRANSFORM:
+            RouteOSCMessage<FOSCT_TransformLink, FTransform>(InMessage, TransformLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetTransform,
+            &IOSCT_Router::Execute_GET_Transform,
+            &IOSCT_Router::Execute_GET_Transform_Tick);
+            break;
+        case EOSCT_RouteType::STRING:
+            RouteOSCMessage<FOSCT_StringLink, FString>(InMessage, StringLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetString,
+            &IOSCT_Router::Execute_GET_String);
+            break;
+        case EOSCT_RouteType::NOTE:
+            RouteOSCMessage<FOSCT_NoteLink, FOSCT_Note>(InMessage, NoteLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetNotes,
+            &IOSCT_Router::Execute_GET_Notes);
+            break;
+        case EOSCT_RouteType::FLOAT_PACK:
+            RouteOSCMessage<FOSCT_FloatPackLink, TMap<FString, float>>(InMessage, FloatPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetFloatPack,
+            &IOSCT_Router::Execute_GET_Float_Pack,
+            &IOSCT_Router::Execute_GET_Float_Pack_Tick);
+            break;
+        case EOSCT_RouteType::EVENT_PACK:
+            RouteOSCMessage<FOSCT_EventPackLink, TMap<FString, bool>>(InMessage, EventPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetEventPack,
+            &IOSCT_Router::Execute_GET_Event_Pack);
+            break;
+        case EOSCT_RouteType::VEC2_PACK:
+            RouteOSCMessage<FOSCT_Vector2PackLink, TMap<FString, FVector2D>>(InMessage, Vec2PackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector2Pack,
+            &IOSCT_Router::Execute_GET_Vector2_Pack,
+            &IOSCT_Router::Execute_GET_Vector2_Pack_Tick);
+            break;
+        case EOSCT_RouteType::VEC3_PACK:
+            RouteOSCMessage<FOSCT_Vector3PackLink, TMap<FString, FVector>>(InMessage, Vec3PackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetVector3Pack,
+            &IOSCT_Router::Execute_GET_Vector3_Pack,
+            &IOSCT_Router::Execute_GET_Vector3_Pack_Tick);
+            break;
+        case EOSCT_RouteType::ROTATION_PACK:
+            RouteOSCMessage<FOSCT_RotationPackLink, TMap<FString, FRotator>>(InMessage, RotationPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetRotationPack,
+            &IOSCT_Router::Execute_GET_Rotation_Pack,
+            &IOSCT_Router::Execute_GET_Rotation_Pack_Tick);
+            break;
+        case EOSCT_RouteType::COLOR_PACK:
+            RouteOSCMessage<FOSCT_ColorPackLink, TMap<FString, FLinearColor>>(InMessage, ColorPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetColorPack,
+            &IOSCT_Router::Execute_GET_Color_Pack,
+            &IOSCT_Router::Execute_GET_Color_Pack_Tick);
+            break;
+        case EOSCT_RouteType::TRANSFORM_PACK:
+            RouteOSCMessage<FOSCT_TransformPackLink, TMap<FString, FTransform>>(InMessage, TransformPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetTransformPack,
+            &IOSCT_Router::Execute_GET_Transform_Pack,
+            &IOSCT_Router::Execute_GET_Transform_Pack_Tick);
+            break;          
+        case EOSCT_RouteType::STRING_PACK:
+            RouteOSCMessage<FOSCT_StringPackLink, TArray<FString>>(InMessage, StringPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetStringPack,
+            &IOSCT_Router::Execute_GET_String_Pack);
+            break;                    
+        default:
+            UE_LOG(OSCToolset, Warning, TEXT("Received a message not well formatted from a Receiver: %s"), *Address);
+            break;
+        }
+    }
+    // Try to handle as a command last
+    HandleCommands(InMessage);
+}
+
+void UOSCT_Master::Tick(float DeltaTime)
+{
+    // Important: Only tick if the game is actually running/unpaused
+    UWorld* World = GetWorld();
+    if (!World || World->IsPaused()) return;
+    if (TickableAddresses.Num() == 0) return; //If no active addresses.
+    for (auto It = TickableAddresses.CreateIterator(); It; ++It)
+    {
+        FName Address = *It;
+        bool bAnyLinkStillMoving = false;
+        // Float
+        ProcessActiveLinksTick<FOSCT_FloatLink>(FloatLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_FloatLink& Link, const float& Val) {
+            IOSCT_Router::Execute_GET_Float_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_FloatPackLink>(FloatPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_FloatPackLink& Link, const TMap < FString, float >& Val) {
+            IOSCT_Router::Execute_GET_Float_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Vector 2
+        ProcessActiveLinksTick<FOSCT_Vector2Link>(Vec2Links, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector2Link& Link, const FVector2D& Val) {
+            IOSCT_Router::Execute_GET_Vector2_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_Vector2PackLink>(Vec2PackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector2PackLink& Link, const TMap < FString, FVector2D >& Val) {
+            IOSCT_Router::Execute_GET_Vector2_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Vector 3
+        ProcessActiveLinksTick<FOSCT_Vector3Link>(Vec3Links, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector3Link& Link, const FVector& Val) {
+            IOSCT_Router::Execute_GET_Vector3_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_Vector3PackLink>(Vec3PackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_Vector3PackLink& Link, const TMap < FString, FVector >& Val) {
+            IOSCT_Router::Execute_GET_Vector3_Pack_Tick(Obj, Link.Data, Val);
+        });
+        // //Rotation
+        ProcessActiveLinksTick<FOSCT_RotationLink>(RotationLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_RotationLink& Link, const FRotator& Val) {
+            IOSCT_Router::Execute_GET_Rotation_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_RotationPackLink>(RotationPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_RotationPackLink& Link, const TMap < FString, FRotator >& Val) {
+            IOSCT_Router::Execute_GET_Rotation_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Color
+        ProcessActiveLinksTick<FOSCT_ColorLink>(ColorLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_ColorLink& Link, const FLinearColor& Val) {
+            IOSCT_Router::Execute_GET_Color_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_ColorPackLink>(ColorPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_ColorPackLink& Link, const TMap < FString, FLinearColor >& Val) {
+            IOSCT_Router::Execute_GET_Color_Pack_Tick(Obj, Link.Data, Val);
+        });
+        //Transform
+        ProcessActiveLinksTick<FOSCT_TransformLink>(TransformLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_TransformLink& Link, const FTransform& Val) {
+            IOSCT_Router::Execute_GET_Transform_Tick(Obj, Link.Data, Val);
+        });
+        ProcessActiveLinksTick<FOSCT_TransformPackLink>(TransformPackLinks, Address, DeltaTime, bAnyLinkStillMoving, 
+        [](UObject* Obj, const FOSCT_TransformPackLink& Link, const TMap < FString, FTransform >& Val) {
+            IOSCT_Router::Execute_GET_Transform_Pack_Tick(Obj, Link.Data, Val);
+        });
+        if (!bAnyLinkStillMoving) It.RemoveCurrent();
+    }
 }

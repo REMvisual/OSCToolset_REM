@@ -5,9 +5,10 @@
 
 UOSCT_Settings::UOSCT_Settings()
 {
-	ServerAddress = "127.0.0.1";
+	ServerAddress = "0.0.0.0";
 	ServerPort = 9999;
 	ClientAddress = "127.0.0.1";
 	ClientPort = 9998;
 	MulticastLoopback = false;
+	UseLocalIPV4 = false;
 }

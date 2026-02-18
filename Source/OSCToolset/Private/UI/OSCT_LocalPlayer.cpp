@@ -18,7 +18,7 @@
 #include "Engine/LocalPlayer.h"
 
 #include "OSCT_Master.h"
-
+#include "OSCToolsetLog.h"
 
 void UOSCT_LocalPlayer::Initialize(FSubsystemCollectionBase& Collection)
 {
