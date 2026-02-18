@@ -135,7 +135,19 @@ private:
 		TargetMap.FindOrAdd(AddressKey).AddUnique(NewLink);
 		AddressToType.FindOrAdd(AddressKey) = UOSCT_Functions::ConvertModuleTypeToRouteType(Receiver.ModuleType, Receiver.Pack);
 	}
+	
+// Fallback for simple types (float, int, etc)
+template<typename T>
+static int32 GetMessageSize(const T& Message) { return 1; }
 
+// Overload for TMaps
+template<typename K, typename V>
+static int32 GetMessageSize(const TMap<K, V>& Message) { return Message.Num(); }
+
+// Overload for TArrays
+template<typename InT>
+static int32 GetMessageSize(const TArray<InT>& Message) { return Message.Num(); }
+	
 template<typename TLink, typename TValue>
 TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap, 
 							 TMap<FName, EOSCT_RouteType>& CacheMap, 
@@ -157,8 +169,10 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 					Link.CurrentValue = NewValue;
 					Link.bInitialized = true;
 					Link.bNeedsInterpolation = false;
-					IOSCT_Router::Execute_OnReceiverInit(Link.GetOwner(), Link.Data);
-					UE_LOG(OSCToolset, Log, TEXT("Intialize key %s"), *Key.ToString());
+					Link.bIsFirstFrame = true;
+					
+					int32 MessageSize = GetMessageSize(NewValue);
+					IOSCT_Router::Execute_OnReceiverInit(Link.GetOwner(), Link.Data, MessageSize);
 				}
 				else
 				{
@@ -168,7 +182,7 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 					if (Link.Data.Tick.bEnable)
 					{
 						TickableAddresses.FindOrAdd(Key);
-					}
+					}	
 				}
 			}
 			else
