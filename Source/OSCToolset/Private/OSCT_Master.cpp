@@ -70,7 +70,6 @@ void UOSCT_Master::AddReceiver(FOSCT_Receiver Receiver, UObject* Owner)
             else               AddReceiverLink(ColorLinks, AddressKey, Receiver, Owner);
             break;
         case EOSCT_ModuleType::TRANSFORM:
-            UE_LOG(OSCToolset, Warning, TEXT("Adding a transform ?"));
             if (Receiver.Pack) AddReceiverLink(TransformPackLinks, AddressKey, Receiver, Owner);
             else               AddReceiverLink(TransformLinks, AddressKey, Receiver, Owner);
             break;
@@ -114,37 +113,22 @@ void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner
         return;
     }
 
-    // // Ensure the table uses our struct
-    // if (InTable->RowStruct->IsChildOf(FOSCT_Receiver::StaticStruct()) || 
-    //     InTable->RowStruct->IsChildOf(FOSCT_Module::StaticStruct()))
-    // {
-    //     static const FString ContextString(TEXT("OSC Receiver Ingestion"));
-    //     TArray<FOSCT_Receiver*> Rows;
-    //     InTable->GetAllRows<FOSCT_Receiver>(ContextString, Rows);
-    //
-    //     // for (FOSCT_Receiver* RowData : Rows)
-    //     // {
-    //     //     if (RowData)
-    //     //     {
-    //     //         // Create the link
-    //     //         FOSCT_ReceiverLink NewLink;
-    //     //         
-    //     //         // Copy the data from the table
-    //     //         NewLink.ReceiverData = *RowData;
-    //     //         
-    //     //         // CRITICAL: Assign the owner so filters work!
-    //     //         NewLink.ReceiverData.Owner = Owner;
-    //     //         
-    //     //         // Force the cache to build now so it's ready for the first OSC message
-    //     //         // NewLink.ReceiverData.RefreshCache();
-    //     //
-    //     //         // Add to your Master's active list
-    //     //         ReceiverMap.FindOrAdd(FormattedAddress).AddUnique(NewLink);
-    //     //         
-    //     //         UE_LOG(LogTemp, Log, TEXT("Registered OSC Receiver: %s"), *NewLink.ReceiverData.GetFormattedAddress());
-    //     //     }
-    //     // }
-    // }
+    // Ensure the table uses our struct
+    if (InTable->RowStruct->IsChildOf(FOSCT_ReceiverRow::StaticStruct()))
+    {
+        static const FString ContextString(TEXT("OSCT Receiver Rows"));
+        TArray<FOSCT_ReceiverRow*> Rows;
+        InTable->GetAllRows<FOSCT_ReceiverRow>(ContextString, Rows);
+        
+        for (FOSCT_ReceiverRow* RowData: Rows)
+        {
+            if (RowData)
+            {
+                FOSCT_Receiver NewReceiver(*RowData);
+                AddReceiver(NewReceiver, Owner);
+            }
+        }
+    }
 }
 
 void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Module, UObject* Owner)
