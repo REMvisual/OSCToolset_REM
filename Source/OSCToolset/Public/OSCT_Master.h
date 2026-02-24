@@ -60,11 +60,25 @@ public:
 	
 	////// SENDERS
 	UFUNCTION()
-	bool SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner);
+	void SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner);
 	UFUNCTION()
 	void Send_Event(UPARAM(ref) FOSCT_Sender& Sender, UObject* Owner );
 	UFUNCTION()
+	void Send_Bool(UPARAM(ref) FOSCT_Sender& Sender, const bool Value, UObject* Owner );
+	UFUNCTION()
 	void Send_Float(UPARAM(ref) FOSCT_Sender& Sender,  const float Value, UObject* Owner);
+	UFUNCTION()
+	void Send_Integer(UPARAM(ref) FOSCT_Sender& Sender,  const int32 Value, UObject* Owner);
+	UFUNCTION()
+	void Send_Vector2(UPARAM(ref) FOSCT_Sender& Sender,  const FVector2D& Value, UObject* Owner);
+	UFUNCTION()
+	void Send_Vector3(UPARAM(ref) FOSCT_Sender& Sender,  const FVector& Value, UObject* Owner);
+	UFUNCTION()
+	void Send_Rotation(UPARAM(ref) FOSCT_Sender& Sender,  const FRotator& Value, UObject* Owner);
+	UFUNCTION()
+	void Send_Color(UPARAM(ref) FOSCT_Sender& Sender,  const FLinearColor& Value, UObject* Owner);
+	UFUNCTION()
+	void Send_Transform(UPARAM(ref) FOSCT_Sender& Sender,  const FTransform& Value, UObject* Owner);
 	UFUNCTION()
 	void Send_String(UPARAM(ref) FOSCT_Sender& Sender, const FString& Value, UObject* Owner);
 
@@ -96,9 +110,15 @@ private:
 	TMap<FName, TArray<FOSCT_EventLink>> EventLinks;
 	TMap<FName, TArray<FOSCT_EventPackLink>> EventPackLinks;
 	
+	TMap<FName, TArray<FOSCT_BoolLink>> BoolLinks;
+	TMap<FName, TArray<FOSCT_BoolPackLink>> BoolPackLinks;
+	
 	TMap<FName, TArray<FOSCT_FloatLink>> FloatLinks;
 	TMap<FName, TArray<FOSCT_FloatPackLink>> FloatPackLinks;
 	
+	TMap<FName, TArray<FOSCT_IntegerLink>> IntegerLinks;
+	TMap<FName, TArray<FOSCT_IntegerPackLink>> IntegerPackLinks;
+
 	TMap<FName, TArray<FOSCT_Vector2Link>> Vec2Links;
 	TMap<FName, TArray<FOSCT_Vector2PackLink>> Vec2PackLinks;
 	
@@ -138,7 +158,7 @@ private:
 	
 // Fallback for simple types (float, int, etc)
 template<typename T>
-static int32 GetMessageSize(const T& Message) { return 1; }
+static int32 GetMessageSize(const T& Message) { return 2; }
 
 // Overload for TMaps
 template<typename K, typename V>

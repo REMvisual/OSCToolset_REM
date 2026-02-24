@@ -8,6 +8,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Engine/Engine.h" //Required for GEngine
 #include "OSCT_ETypes.h"
+#include "OSCT_Modules.h"
 
 #include "OSCT_Functions.generated.h"
 
@@ -48,14 +49,19 @@ class OSCTOOLSET_API UOSCT_Functions : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static void DisplayDebug(const FOSCT_Receiver& Module, const FString& Message);
+	// static void DisplayDebug(const FOSCT_Receiver& Module, const FString& Message);
+	static void DisplayDebug(
+		const FString& FormattedAddress, 
+		const EOSCT_ModuleType& ModuleType,
+		const FOSCT_ModuleDebug& Debug, 
+		const FString& Message);
 	
 	/** Safely converts any Enum to a string without crashing the Editor */
 	template<typename T>
 	static FString GetEnumString(T EnumValue);
 
-	static EOSCT_ModuleType ConvertSenderTypeToModuleType(EOSCT_SenderType InSender);
-	static EOSCT_SenderType ConvertModuleTypeToSenderType(EOSCT_ModuleType InModule);
+	// static EOSCT_ModuleType ConvertSenderTypeToModuleType(EOSCT_SenderType InSender);
+	// static EOSCT_SenderType ConvertModuleTypeToSenderType(EOSCT_ModuleType InModule);
 	static EOSCT_RouteType ConvertModuleTypeToRouteType(EOSCT_ModuleType InModule, const bool bPack);
 	static int32 GetComponentLength(EOSCT_RouteType Type);
 	
@@ -94,7 +100,22 @@ public:
 			*Link.Data.FormattedAddress, 
 			*ValueStr);
 
-		DisplayDebug(Link.Data, FullMessage);
+		DisplayDebug(Link.Data.FormattedAddress, Link.Data.ModuleType, Link.Data.Debug, FullMessage);
+	}
+	//Debug Template
+	template<typename TSender, typename TValue>
+	static void DebugSender(const TSender& Sender, const TValue& Value)
+	{
+		if (!Sender.Debug.PrintOnLog && !Sender.Debug.PrintOnScreen) return;
+		
+		// Use our custom stringifier
+		FString ValueStr = OSCT_DebugString::ToString(Value);
+		
+		FString FullMessage = FString::Printf(TEXT("%s: %s"), 
+			*Sender.FormattedAddress, 
+			*ValueStr);
+
+		DisplayDebug(Sender.FormattedAddress, Sender.ModuleType, Sender.Debug, FullMessage);
 	}
 	
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Debug")
