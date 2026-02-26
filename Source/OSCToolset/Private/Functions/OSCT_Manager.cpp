@@ -66,11 +66,70 @@ void UOSCT_Manager::SendEvent(UObject* WorldContextObject, FOSCT_Sender& Sender,
 	
 }
 
+void UOSCT_Manager::SendBool(UObject* WorldContextObject, FOSCT_Sender& Sender, const bool Value, UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Bool(Sender, Value, Owner);
+	}
+}
+
 void UOSCT_Manager::SendFloat(UObject* WorldContextObject, FOSCT_Sender& Sender, const float Value, UObject* Owner)
 {
 	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
 	{
 		Master->Send_Float(Sender, Value, Owner);
+	}
+}
+
+void UOSCT_Manager::SendInteger(UObject* WorldContextObject, FOSCT_Sender& Sender, const int32 Value, UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Integer(Sender, Value, Owner);
+	}
+}
+
+void UOSCT_Manager::SendVector2(UObject* WorldContextObject, FOSCT_Sender& Sender, const FVector2D Value, UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Vector2(Sender, Value, Owner);
+	}
+}
+
+void UOSCT_Manager::SendVector3(UObject* WorldContextObject, FOSCT_Sender& Sender, const FVector Value, UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Vector3(Sender, Value, Owner);
+	}
+}
+
+void UOSCT_Manager::SendRotation(UObject* WorldContextObject, FOSCT_Sender& Sender, const FRotator Value,
+	UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Rotation(Sender, Value, Owner);
+	}
+}
+
+void UOSCT_Manager::SendColor(UObject* WorldContextObject, FOSCT_Sender& Sender, const FLinearColor Value,
+	UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Color(Sender, Value, Owner);
+	}
+}
+
+void UOSCT_Manager::SendTransform(UObject* WorldContextObject, FOSCT_Sender& Sender, const FTransform Value,
+	UObject* Owner)
+{
+	if (UOSCT_Master* Master = GetMaster(WorldContextObject))
+	{
+		Master->Send_Transform(Sender, Value, Owner);
 	}
 }
 

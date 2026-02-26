@@ -9,7 +9,7 @@
 #include "Widgets/Input/SSpinBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SCheckBox.h"
-
+#include "OSCT_Settings.h"
 /**
  * 
  */
@@ -28,24 +28,31 @@ public:
 private:
 
 	void SaveSettings();
-
-	TSharedPtr<SEditableTextBox> ServerAddressTextBox;
-	TSharedPtr<SSpinBox<int32>> ServerPortSpinBox;
-	TSharedPtr<SCheckBox> MulticastLoopbackBox;
-
-	TSharedPtr<SEditableTextBox> ClientAddressTextBox;
-	TSharedPtr<SSpinBox<int32>> ClientPortSpinBox;
 	
-	TSharedPtr<SCheckBox> UseLocalIPV4Box;
+	// Helper functions to build UI pieces
+	TSharedRef<SWidget> MakeHeaderWidget();
+	TSharedRef<SWidget> MakeServerSettingsWidget();
+	void RefreshClientList();
 	
 	//FReply OnSaveSettings();
 	FReply OnReinitializeOSCT();
+	
+	FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 18); 
+	FSlateFontInfo LabelFont = FCoreStyle::GetDefaultFontStyle("Regular", 14);
+	
+	// TSharedPtr<SEditableTextBox> ServerAddressTextBox;
+	// TSharedPtr<SSpinBox<int32>> ServerPortSpinBox;
+	// TSharedPtr<SCheckBox> MulticastLoopbackBox;
+	//
+	// TSharedRef<SWidget> MakeClientEntryWidget(int32 Index, FOSCT_Network& ClientData);
+	//
+	// TSharedPtr<SEditableTextBox> ClientAddressTextBox;
+	// TSharedPtr<SSpinBox<int32>> ClientPortSpinBox;
+	//
+	// TSharedPtr<SCheckBox> UseLocalIPV4Box;
+	
+	UOSCT_Settings* Settings;
+	TSharedPtr<SVerticalBox> MainContentBox;
+	TSharedPtr<SVerticalBox> ClientListBox;
 
-	FString ServerAddress;
-	int32 ServerPort;
-	bool MulticastLoopback;
-
-	FString ClientAddress;
-	int32 ClientPort; 
-	bool UseLocalIPV4;
 };

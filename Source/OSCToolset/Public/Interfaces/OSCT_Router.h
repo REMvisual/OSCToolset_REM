@@ -41,6 +41,18 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Event|Pack")
 	void GET_Event_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, bool>& Map);
 	
+	// Bool
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Boolean")
+	void GET_Boolean(const FOSCT_Receiver& Receiver, const bool Value);
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Boolean|Pack")
+	void GET_Boolean_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, bool>& Map);
+
+	// Integer
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Integer")
+	void GET_Integer(const FOSCT_Receiver& Receiver, const int32& Value);
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Integer|Pack")
+	void GET_Integer_Pack(const FOSCT_Receiver& Receiver, const TMap<FString, int32>& Map);
+
 	// Float
 	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Float")
 	void GET_Float(const FOSCT_Receiver& Receiver, const float& Value);

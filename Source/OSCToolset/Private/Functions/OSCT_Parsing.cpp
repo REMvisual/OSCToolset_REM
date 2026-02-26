@@ -39,6 +39,19 @@ bool UOSCT_Parsing::TryGetEvent(const FOSCMessage& InMessage, bool& OutValue)
 	//Events are like a trigger, no need to parse the value.
 	return true;
 }
+
+bool UOSCT_Parsing::TryGetBool(const FOSCMessage& InMessage, bool& OutValue)
+{
+	bool Value = false;
+	const bool bSuccess = UOSCManager::GetBool(InMessage, 0, Value);
+	if (bSuccess)
+	{
+		OutValue = Value;
+		return true;
+	}
+	return false;
+}
+
 bool UOSCT_Parsing::TryGetFloat(const FOSCMessage& InMessage, float& OutValue)
 {
 	float X=0.0f;
@@ -51,6 +64,19 @@ bool UOSCT_Parsing::TryGetFloat(const FOSCMessage& InMessage, float& OutValue)
 	}
 	return false;
 }
+
+bool UOSCT_Parsing::TryGetInteger(const FOSCMessage& InMessage, int32& OutValue)
+{
+	int32 Value = 0;
+	const bool bSuccess = UOSCManager::GetInt32(InMessage, 0, Value);
+	if (bSuccess)
+	{
+		OutValue = Value;
+		return true;
+	}
+	return false;
+}
+
 bool UOSCT_Parsing::TryGetVector2(const FOSCMessage& InMessage, FVector2D& OutValue)
 {
 	float X=0.0f, Y=0.0f;
@@ -171,11 +197,23 @@ bool UOSCT_Parsing::TryGetEventPack(const FOSCMessage& InMessage, TMap<FString, 
 	return TryGetGenericPack<bool>(
 		InMessage, 
 		OutMap, 
-		EOSCT_RouteType::EVENT_PACK, // Use your Event route type here
+		EOSCT_RouteType::EVENT_PACK, 
 		[](const FOSCMessage& Msg, int32 StartIdx, bool& OutVal) {
 			return UOSCManager::GetBool(Msg, StartIdx, OutVal);
 		});
 }
+
+bool UOSCT_Parsing::TryGetBoolPack(const FOSCMessage& InMessage, TMap<FString, bool>& OutMap)
+{
+	return TryGetGenericPack<bool>(
+	InMessage, 
+	OutMap, 
+	EOSCT_RouteType::BOOL_PACK,
+	[](const FOSCMessage& Msg, int32 StartIdx, bool& OutVal) {
+		return UOSCManager::GetBool(Msg, StartIdx, OutVal);
+	});
+}
+
 bool UOSCT_Parsing::TryGetFloatPack(const FOSCMessage& InMessage, TMap < FString, float >& OutMap)
 {
 	return TryGetGenericPack<float>(
@@ -185,6 +223,17 @@ bool UOSCT_Parsing::TryGetFloatPack(const FOSCMessage& InMessage, TMap < FString
 		[](const FOSCMessage& Msg, int32 StartIdx, float& OutVal) {
 			return UOSCManager::GetFloat(Msg, StartIdx, OutVal);
 		});
+}
+
+bool UOSCT_Parsing::TryGetIntegerPack(const FOSCMessage& InMessage, TMap<FString, int32>& OutMap)
+{
+	return TryGetGenericPack<int32>(
+	InMessage, 
+	OutMap, 
+	EOSCT_RouteType::INT_PACK, 
+	[](const FOSCMessage& Msg, int32 StartIdx, int32& OutVal) {
+		return UOSCManager::GetInt32(Msg, StartIdx, OutVal);
+	});
 }
 
 bool UOSCT_Parsing::TryGetVector2Pack(const FOSCMessage& InMessage, TMap<FString, FVector2D>& OutMap)

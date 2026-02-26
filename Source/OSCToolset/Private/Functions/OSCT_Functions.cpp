@@ -18,27 +18,27 @@ FString UOSCT_Functions::GetEnumString(T EnumValue)
 	return EnumPtr->GetNameStringByValue(static_cast<int64>(EnumValue));
 }
 
-EOSCT_ModuleType UOSCT_Functions::ConvertSenderTypeToModuleType(EOSCT_SenderType InSender)
-{
-	switch (InSender)
-	{
-	case EOSCT_SenderType::EVENT:  return EOSCT_ModuleType::EVENT;
-	case EOSCT_SenderType::FLOAT:  return EOSCT_ModuleType::FLOAT;
-	case EOSCT_SenderType::STRING: return EOSCT_ModuleType::STRING;
-	default:                       return EOSCT_ModuleType::EVENT;
-	}
-}
+// EOSCT_ModuleType UOSCT_Functions::ConvertSenderTypeToModuleType(EOSCT_SenderType InSender)
+// {
+// 	switch (InSender)
+// 	{
+// 	case EOSCT_SenderType::EVENT:  return EOSCT_ModuleType::EVENT;
+// 	case EOSCT_SenderType::FLOAT:  return EOSCT_ModuleType::FLOAT;
+// 	case EOSCT_SenderType::STRING: return EOSCT_ModuleType::STRING;
+// 	default:                       return EOSCT_ModuleType::EVENT;
+// 	}
+// }
 
-EOSCT_SenderType UOSCT_Functions::ConvertModuleTypeToSenderType(EOSCT_ModuleType InModule)
-{
-	switch (InModule)
-	{
-	case EOSCT_ModuleType::EVENT:  return EOSCT_SenderType::EVENT;
-	case EOSCT_ModuleType::FLOAT:  return EOSCT_SenderType::FLOAT;
-	case EOSCT_ModuleType::STRING: return EOSCT_SenderType::STRING;
-	default:                       return EOSCT_SenderType::EVENT;
-	}
-}
+// EOSCT_SenderType UOSCT_Functions::ConvertModuleTypeToSenderType(EOSCT_ModuleType InModule)
+// {
+// 	switch (InModule)
+// 	{
+// 	case EOSCT_ModuleType::EVENT:  return EOSCT_SenderType::EVENT;
+// 	case EOSCT_ModuleType::FLOAT:  return EOSCT_SenderType::FLOAT;
+// 	case EOSCT_ModuleType::STRING: return EOSCT_SenderType::STRING;
+// 	default:                       return EOSCT_SenderType::EVENT;
+// 	}
+// }
 
 EOSCT_RouteType UOSCT_Functions::ConvertModuleTypeToRouteType(EOSCT_ModuleType InModule, const bool bPack)
 {
@@ -46,8 +46,12 @@ EOSCT_RouteType UOSCT_Functions::ConvertModuleTypeToRouteType(EOSCT_ModuleType I
 	{
 	case EOSCT_ModuleType::EVENT:  
 		return bPack ? EOSCT_RouteType::EVENT_PACK : EOSCT_RouteType::EVENT;
+	case EOSCT_ModuleType::BOOL:  
+		return bPack ? EOSCT_RouteType::BOOL_PACK : EOSCT_RouteType::BOOL;
 	case EOSCT_ModuleType::FLOAT:  
 		return bPack ? EOSCT_RouteType::FLOAT_PACK : EOSCT_RouteType::FLOAT;
+	case EOSCT_ModuleType::INT:  
+		return bPack ? EOSCT_RouteType::INT_PACK : EOSCT_RouteType::INT;
 	case EOSCT_ModuleType::VEC2:
 		return bPack ? EOSCT_RouteType::VEC2_PACK : EOSCT_RouteType::VEC2;
 	case EOSCT_ModuleType::VEC3:   
@@ -75,8 +79,12 @@ int32 UOSCT_Functions::GetComponentLength(EOSCT_RouteType Type)
 	{
 	case EOSCT_RouteType::EVENT:
 	case EOSCT_RouteType::EVENT_PACK:
+	case EOSCT_RouteType::BOOL:
+	case EOSCT_RouteType::BOOL_PACK:
 	case EOSCT_RouteType::FLOAT:
 	case EOSCT_RouteType::FLOAT_PACK:
+	case EOSCT_RouteType::INT:
+	case EOSCT_RouteType::INT_PACK:
 		return 1;
 	case EOSCT_RouteType::VEC2:
 	case EOSCT_RouteType::VEC2_PACK:
@@ -172,38 +180,43 @@ FOSCMessage UOSCT_Functions::CreateStateUpdate(
 	return Msg;
 }
 
-void UOSCT_Functions::SendReceiverStateUpdate(UOSCClient* Client, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting)
+void UOSCT_Functions::SendReceiverStateUpdate(const TArray<UOSCClient*>& Clients, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting)
 {
-	if (!Client || !Context) return;
-
-	FOSCMessage Msg = CreateStateUpdate(
-		Context,
-		Data.Address,
-		Data.FormattedAddress,
-		Data.Role,
-		Data.ModuleType,
-		Data.Pack,
-		bIsConnecting
-	);
-	Client->SendOSCMessage(Msg);
-	// UE_LOG(OSCToolset, Log, TEXT("Send Module Receiver State Update"));
+	for (UOSCClient* Client : Clients)
+	{
+		if (Client) {
+			FOSCMessage Msg = CreateStateUpdate(
+				Context,
+				Data.Address,
+				Data.FormattedAddress,
+				Data.Role,
+				Data.ModuleType,
+				Data.Pack,
+				bIsConnecting
+			);
+			Client->SendOSCMessage(Msg);
+		}
+	}
 }
 
-void UOSCT_Functions::SendSenderStateUpdate(UOSCClient* Client, const FOSCT_Sender& Data, UObject* Context,	bool bIsConnecting)
+void UOSCT_Functions::SendSenderStateUpdate(const TArray<UOSCClient*>& Clients, const FOSCT_Sender& Data, UObject* Context,	bool bIsConnecting)
 {
-	if (!Client || !Context) return;
-
-	FOSCMessage Msg = CreateStateUpdate(
-		Context,
-		Data.Address,
-		Data.FormattedAddress,
-		Data.Role,
-		ConvertSenderTypeToModuleType(Data.Type),
-		false,
-		bIsConnecting
-	);
-	Client->SendOSCMessage(Msg);
-	// UE_LOG(OSCToolset, Log, TEXT("Send Module SENDER State Update"));
+	for (UOSCClient* Client : Clients)
+	{
+		if (Client)
+		{
+			FOSCMessage Msg = CreateStateUpdate(
+				Context,
+				Data.Address,
+				Data.FormattedAddress,
+				Data.Role,
+				Data.ModuleType,
+				false,
+				bIsConnecting
+			);
+			Client->SendOSCMessage(Msg);
+		}
+	}
 }
 
 FColor UOSCT_Functions::GetModuleDebugColor(const EOSCT_ModuleType& ModuleType)
@@ -214,8 +227,14 @@ FColor UOSCT_Functions::GetModuleDebugColor(const EOSCT_ModuleType& ModuleType)
 	case EOSCT_ModuleType::EVENT:
 		DebugColor = FColor(255, 0, 100);
 		break;
+	case EOSCT_ModuleType::BOOL:
+		DebugColor = FColor(255, 0, 0);
+		break;
 	case EOSCT_ModuleType::FLOAT:
 		DebugColor = FColor(80, 255, 0);
+		break;
+	case EOSCT_ModuleType::INT:
+		DebugColor = FColor(50, 255, 150);
 		break;
 	case EOSCT_ModuleType::VEC2:
 		DebugColor = FColor(0, 200, 255);
@@ -242,20 +261,25 @@ FColor UOSCT_Functions::GetModuleDebugColor(const EOSCT_ModuleType& ModuleType)
 	return DebugColor;
 }
 
-void UOSCT_Functions::DisplayDebug(const FOSCT_Receiver& Module, const FString& Message)
+void UOSCT_Functions::DisplayDebug(
+		const FString& FormattedAddress, 
+		const EOSCT_ModuleType& ModuleType,
+		const FOSCT_ModuleDebug& Debug, 
+		const FString& Message
+		)
 {
 	// Use a hash of the address as a KEY so the message updates in place instead of scrolling
-	uint64 Key = GetTypeHash(Module.FormattedAddress);
-	FColor Color = (Module.Debug.DebugColor != FColor::White) 
-				   ? Module.Debug.DebugColor
-				   : GetModuleDebugColor(Module.ModuleType);
+	uint64 Key = GetTypeHash(FormattedAddress);
+	FColor Color = (Debug.DebugColor != FColor::White) 
+				   ? Debug.DebugColor
+				   : GetModuleDebugColor(ModuleType);
 
-	if (GEngine && Module.Debug.PrintOnScreen)
+	if (GEngine && Debug.PrintOnScreen)
 	{
-		GEngine->AddOnScreenDebugMessage(Key, Module.Debug.DebugDuration, Color, Message);
+		GEngine->AddOnScreenDebugMessage(Key, Debug.DebugDuration, Color, Message);
 	}
     
-	if (Module.Debug.PrintOnLog)
+	if (Debug.PrintOnLog)
 	{
 		UE_LOG(OSCToolset, Log, TEXT("%s"), *Message);
 	}

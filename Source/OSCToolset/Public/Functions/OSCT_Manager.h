@@ -40,7 +40,28 @@ private:
 	static void SendEvent(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, UObject* Owner);
 	
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendBool(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const bool Value, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
 	static void SendFloat(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const float Value, UObject* Owner);
+
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendInteger(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const int32 Value, UObject* Owner);
+
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendVector2(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const FVector2D Value, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendVector3(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const FVector Value, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendRotation(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const FRotator Value, UObject* Owner);
+	
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendColor(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const FLinearColor Value, UObject* Owner);
+
+	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
+	static void SendTransform(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const FTransform Value, UObject* Owner);
 
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Senders", meta = (WorldContext = "WorldContextObject", DefaultToSelf = "Owner", HidePin = "Owner"))
 	static void SendString(UObject * WorldContextObject, UPARAM(ref) FOSCT_Sender& Sender, const FString& Value, UObject* Owner);

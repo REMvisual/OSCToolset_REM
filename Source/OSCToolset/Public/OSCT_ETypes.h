@@ -21,7 +21,9 @@ UENUM(BlueprintType)
 enum class EOSCT_ModuleType : uint8
 {
 	EVENT	UMETA(DisplayName = "Event"),
+	BOOL     UMETA(DisplayName = "Boolean"),
 	FLOAT	UMETA(DisplayName = "Float"),
+	INT     UMETA(DisplayName = "Integer"),
 	VEC2	UMETA(DisplayName = "Vector 2"),
 	VEC3	UMETA(DisplayName = "Vector 3"),
 	COLOR	UMETA(DisplayName = "Color"),
@@ -36,8 +38,12 @@ enum class EOSCT_RouteType : uint8
 {
 	EVENT			UMETA(DisplayName = "Event"),
 	EVENT_PACK		UMETA(DisplayName = "Event Pack"),
+	BOOL			UMETA(DisplayName = "Boolean"),
+	BOOL_PACK		UMETA(DisplayName = "Boolean Pack"),
 	FLOAT			UMETA(DisplayName = "Float"),
 	FLOAT_PACK		UMETA(DisplayName = "Float Pack"),
+	INT				UMETA(DisplayName = "Integer"),
+	INT_PACK		UMETA(DisplayName = "Integer Pack"),
 	VEC2			UMETA(DisplayName = "Vector 2"),
 	VEC2_PACK		UMETA(DisplayName = "Vector 2 Pack"),
 	VEC3			UMETA(DisplayName = "Vector 3"),

@@ -72,7 +72,9 @@ public:
 	
 	//Single
 	static bool TryGetEvent(const FOSCMessage& InMessage, bool& OutValue);
+	static bool TryGetBool(const FOSCMessage& InMessage, bool& OutValue);
 	static bool TryGetFloat(const FOSCMessage& InMessage, float& OutValue);
+	static bool TryGetInteger(const FOSCMessage& InMessage, int32& OutValue);
 	static bool TryGetVector2(const FOSCMessage& InMessage, FVector2D& OutValue);
 	static bool TryGetVector3(const FOSCMessage& InMessage, FVector& OutValue);
 	static bool TryGetRotation(const FOSCMessage& InMessage, FRotator& OutValue);
@@ -82,7 +84,9 @@ public:
 	static bool TryGetNotes(const FOSCMessage& InMessage, FOSCT_Note& OutValue);
 	//Packs
 	static bool TryGetEventPack(const FOSCMessage& InMessage, TMap < FString, bool>& OutMap);
+	static bool TryGetBoolPack(const FOSCMessage& InMessage, TMap < FString, bool>& OutMap);
 	static bool TryGetFloatPack(const FOSCMessage& InMessage, TMap < FString, float >& OutMap);
+	static bool TryGetIntegerPack(const FOSCMessage& InMessage, TMap < FString, int32 >& OutMap);
 	static bool TryGetVector2Pack(const FOSCMessage& InMessage, TMap < FString, FVector2D >& OutMap);
 	static bool TryGetVector3Pack(const FOSCMessage& InMessage, TMap < FString, FVector >& OutMap);
 	static bool TryGetRotationPack(const FOSCMessage& InMessage, TMap < FString, FRotator >& OutMap);

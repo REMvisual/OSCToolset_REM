@@ -96,7 +96,7 @@ struct FOSCT_Receiver
 		BlueprintReadWrite, 
 		Category = "OSCToolset",
 		meta=(
-			EditCondition = "ModuleType != EOSCT_ModuleType::EVENT && ModuleType != EOSCT_ModuleType::NOTE && ModuleType != EOSCT_ModuleType::STRING", 
+			EditCondition = "ModuleType != EOSCT_ModuleType::EVENT && ModuleType != EOSCT_ModuleType::BOOL && ModuleType != EOSCT_ModuleType::INT && ModuleType != EOSCT_ModuleType::NOTE && ModuleType != EOSCT_ModuleType::STRING", 
 			EditConditionHides))
 	FOSCT_ReceiverTick Tick;
 	
@@ -254,6 +254,16 @@ struct FOSCT_EventLink: public FOSCT_ReceiverLink
 	GENERATED_BODY()
 };
 
+/// BOOL
+USTRUCT()
+struct FOSCT_BoolLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<bool>
+#endif
+{
+	GENERATED_BODY()
+};
+
 /// FLOAT
 USTRUCT()
 struct FOSCT_FloatLink: public FOSCT_ReceiverLink
@@ -266,6 +276,17 @@ struct FOSCT_FloatLink: public FOSCT_ReceiverLink
 
 };
 
+/// INT
+USTRUCT()
+struct FOSCT_IntegerLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_LinkBase<int32>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = float;
+
+};
 
 /// VECTOR2
 USTRUCT()
@@ -376,6 +397,17 @@ struct FOSCT_EventPackLink: public FOSCT_ReceiverLink
 	using ValueType = TMap < FString, bool >;
 };
 
+/// BOOL PACK
+USTRUCT()
+struct FOSCT_BoolPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<bool>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, bool >;
+};
+
 /// FLOAT PACK
 USTRUCT()
 struct FOSCT_FloatPackLink: public FOSCT_ReceiverLink
@@ -386,6 +418,18 @@ struct FOSCT_FloatPackLink: public FOSCT_ReceiverLink
 	GENERATED_BODY()
 	using ValueType = TMap < FString, float >;
 };
+
+/// INT PACK
+USTRUCT()
+struct FOSCT_IntegerPackLink: public FOSCT_ReceiverLink
+#if CPP
+	, public TOSCT_PackLinkBase<int32>
+#endif
+{
+	GENERATED_BODY()
+	using ValueType = TMap < FString, int32 >;
+};
+
 
 /// VEC2 PACK
 USTRUCT()
@@ -462,7 +506,7 @@ struct FOSCT_Sender
 	EOSCT_Role Role = EOSCT_Role::SENDER;
 
 	UPROPERTY()
-	EOSCT_SenderType Type = EOSCT_SenderType::EVENT;
+	EOSCT_ModuleType ModuleType = EOSCT_ModuleType::EVENT;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OSCToolset|Debug")
 	FOSCT_ModuleDebug Debug;

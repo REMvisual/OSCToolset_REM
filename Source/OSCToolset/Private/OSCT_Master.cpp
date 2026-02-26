@@ -49,9 +49,17 @@ void UOSCT_Master::AddReceiver(FOSCT_Receiver Receiver, UObject* Owner)
             if (Receiver.Pack) AddReceiverLink(EventPackLinks, AddressKey, Receiver, Owner);
             else               AddReceiverLink(EventLinks, AddressKey, Receiver, Owner);
             break;
+        case EOSCT_ModuleType::BOOL:
+            if (Receiver.Pack) AddReceiverLink(BoolPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(BoolLinks, AddressKey, Receiver, Owner);
+            break;
         case EOSCT_ModuleType::FLOAT:
             if (Receiver.Pack) AddReceiverLink(FloatPackLinks, AddressKey, Receiver, Owner);
             else               AddReceiverLink(FloatLinks, AddressKey, Receiver, Owner);
+            break;
+        case EOSCT_ModuleType::INT:
+            if (Receiver.Pack) AddReceiverLink(IntegerPackLinks, AddressKey, Receiver, Owner);
+            else               AddReceiverLink(IntegerLinks, AddressKey, Receiver, Owner);
             break;
         case EOSCT_ModuleType::VEC2:
             if (Receiver.Pack) AddReceiverLink(Vec2PackLinks, AddressKey, Receiver, Owner);
@@ -84,7 +92,7 @@ void UOSCT_Master::AddReceiver(FOSCT_Receiver Receiver, UObject* Owner)
             break;
         }
         IOSCT_Router::Execute_OnReceiverAdded(Owner, Receiver);
-        UOSCT_Functions::SendReceiverStateUpdate(OSCT_Client, Receiver, Owner, true);
+        UOSCT_Functions::SendReceiverStateUpdate(OSCT_Clients, Receiver, Owner, true);
         
         UE_LOG(OSCToolset, Log, TEXT("Added OSCT %s: %s to Owner: %s"), 
             *UOSCT_Functions::GetEnumString(Receiver.Role), *Receiver.FormattedAddress, *Owner->GetName());    
@@ -131,17 +139,17 @@ void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner
     }
 }
 
-void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Module, UObject* Owner)
+void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Receiver, UObject* Owner)
 {
     if (!Owner) return;
     if (UOSCT_Functions::FormatAddress(
-        Module.Role,
-        Module.ModuleType,
-        Module.Pack,
-        Module.Address,
-        Module.FormattedAddress))
+        Receiver.Role,
+        Receiver.ModuleType,
+        Receiver.Pack,
+        Receiver.Address,
+        Receiver.FormattedAddress))
     {
-        FName AddressKey = FName(*Module.FormattedAddress);
+        FName AddressKey = FName(*Receiver.FormattedAddress);
         if (const EOSCT_RouteType* RouteTypePtr = AddressToType.Find(AddressKey))
         {
             switch (*RouteTypePtr)
@@ -152,11 +160,23 @@ void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Module, UObject* Owner)
             case EOSCT_RouteType::EVENT_PACK:
                 RemoveReceiverLink(EventPackLinks, AddressToType, AddressKey, Owner);
                 break;
+            case EOSCT_RouteType::BOOL:
+                RemoveReceiverLink(BoolLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::BOOL_PACK:
+                RemoveReceiverLink(BoolPackLinks, AddressToType, AddressKey, Owner);
+                break;
             case EOSCT_RouteType::FLOAT:
                 RemoveReceiverLink(FloatLinks, AddressToType, AddressKey, Owner);
                 break;
             case EOSCT_RouteType::FLOAT_PACK:
                 RemoveReceiverLink(FloatPackLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::INT:
+                RemoveReceiverLink(IntegerLinks, AddressToType, AddressKey, Owner);
+                break;
+            case EOSCT_RouteType::INT_PACK:
+                RemoveReceiverLink(IntegerPackLinks, AddressToType, AddressKey, Owner);
                 break;
             case EOSCT_RouteType::VEC2:
                 RemoveReceiverLink(Vec2Links, AddressToType, AddressKey, Owner);
@@ -198,11 +218,11 @@ void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Module, UObject* Owner)
                 RemoveReceiverLink(NoteLinks, AddressToType, AddressKey, Owner);
                 break;
             default:
-                UE_LOG(OSCToolset, Warning, TEXT("Did not implement removing the receiver for this type: %s"), *Module.FormattedAddress);
+                UE_LOG(OSCToolset, Warning, TEXT("Did not implement removing the receiver for this type: %s"), *Receiver.FormattedAddress);
                 break;
             }
-            //Maybe send the disconnected module state update?
-            UE_LOG(OSCToolset, Log, TEXT("Unregistered OSCT Receiver: %s"), *Module.FormattedAddress);
+            UOSCT_Functions::SendReceiverStateUpdate(OSCT_Clients, Receiver, Owner, false);
+            UE_LOG(OSCToolset, Log, TEXT("Unregistered OSCT Receiver: %s"), *Receiver.FormattedAddress);
         }
     }
 }
@@ -226,6 +246,17 @@ void UOSCT_Master::Initialize(FSubsystemCollectionBase& Collection)
     FCoreUObjectDelegates::PreLoadMap.AddUObject(this, &UOSCT_Master::OnLevelChanged);
 }
 
+void UOSCT_Master::BroadcastOSC(FOSCMessage& Message)
+{
+    for (UOSCClient* Client : OSCT_Clients)
+    {
+        if (Client)
+        {
+            Client->SendOSCMessage(Message);
+        }
+    }
+}
+
 void UOSCT_Master::init_OSCT_Master()
 {
     Settings = GetMutableDefault<UOSCT_Settings>();
@@ -241,24 +272,34 @@ void UOSCT_Master::init_OSCT_Master()
 
 void UOSCT_Master::InitializeOSC()
 {
-    FString Server_addr = SetLocalIPAddress(Settings->ServerAddress, Settings->UseLocalIPV4);
-    int Server_port= Settings->ServerPort;
+    FString Server_addr = SetLocalIPAddress(Settings->ServerConfig.Address, Settings->UseLocalIPV4);
+    int32 Server_port= Settings->ServerConfig.Port;
     bool Multicast_loopback = Settings->MulticastLoopback;
-
-    FString Client_addr= SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4);
-    int Client_port = Settings->ClientPort;
-
     OSCT_Server = UOSCManager::CreateOSCServer(Server_addr, Server_port, Multicast_loopback, true, "OSCT_Server", this);
-    OSCT_Client = UOSCManager::CreateOSCClient(Client_addr, Client_port, "OSCT_Client", this);
     if (OSCT_Server != nullptr)
     {
-        SendOSCTBaseMessage(OSCT_Init_addr);
-        UE_LOG(OSCToolset, Log, TEXT("Send OSCT Master Init message"));
+        // SendOSCTBaseMessage(OSCT_Init_addr);
+        // UE_LOG(OSCToolset, Log, TEXT("Send OSCT Master Init message"));
         OSCT_Server->OnOscMessageReceived.AddDynamic(this, &UOSCT_Master::RouteMessage);
     }
-    if (OSCT_Client != nullptr)
+    
+    
+    OSCT_Clients.Empty(); //Clear clients
+    for (int32 i = 0; i < Settings->RemoteClients.Num(); i++)
+    {
+        const FOSCT_Network& Client = Settings->RemoteClients[i];
+        FString TargetAddress = SetLocalIPAddress(Client.Address, Settings->UseLocalIPV4);
+        FString UniqueClientName = FString::Printf(TEXT("OSCT_Client_%d"), i);
+        UOSCClient* NewClient = UOSCManager::CreateOSCClient(TargetAddress, Client.Port, UniqueClientName, this);
+        if (NewClient)
+        {
+            OSCT_Clients.Add(NewClient);
+        }
+    }
+    if (OSCT_Clients.Num() > 0)
     {
         OnInitOSCT.Broadcast();
+        SendOSCTBaseMessage(OSCT_Init_addr);
         UE_LOG(OSCToolset, Log, TEXT("Initialize OSC from OSCT_Master"));
     }
 }
@@ -274,8 +315,12 @@ void UOSCT_Master::CleanupLinks()
 {
     EventLinks.Empty();
     EventPackLinks.Empty();
+    BoolLinks.Empty();
+    BoolPackLinks.Empty();
     FloatLinks.Empty();
     FloatPackLinks.Empty();
+    IntegerLinks.Empty();
+    IntegerPackLinks.Empty();
     Vec2Links.Empty();
     Vec2PackLinks.Empty();
     Vec3Links.Empty();
@@ -293,22 +338,12 @@ void UOSCT_Master::CleanupLinks()
     TickableAddresses.Empty();
 }
 
-void UOSCT_Master::SendOSCTBaseMessage(FString Message)
-{
-    if (OSCT_Client != nullptr) {
-        FOSCAddress addr = UOSCManager::ConvertStringToOSCAddress(Message);
-        if (addr.GetFullPath().IsEmpty()) {
-            UE_LOG(OSCToolset, Error, TEXT("Invalid OSC Address created from message: %s"), *Message);
-            return;
-        }
-
-        FOSCMessage msg;
-        msg = UOSCManager::SetOSCMessageAddress(msg, addr);
-        OSCT_Client->SendOSCMessage(UOSCManager::SetOSCMessageAddress(msg, addr));
-    } 
-    else {
-        UE_LOG(OSCToolset, Error, TEXT(" OSCT_Client not in memory (nullptr). Can't send an OSCT Base Message: %s"), *Message);
-    }
+void UOSCT_Master::SendOSCTBaseMessage(const FString& Message)
+{   
+    FOSCAddress addr = UOSCManager::ConvertStringToOSCAddress(Message);
+    FOSCMessage msg;
+    msg = UOSCManager::SetOSCMessageAddress(msg, addr);
+    BroadcastOSC(msg);
 }
 
 FString UOSCT_Master::GetLocalIPAddress()
@@ -351,11 +386,29 @@ FString UOSCT_Master::SetLocalIPAddress(FString InAddress, const bool UseLocalIP
 
 void UOSCT_Master::LogSettings()
 {
-    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d | Client Address: %s | Client Port: %d"), 
-        *SetLocalIPAddress(Settings->ServerAddress, Settings->UseLocalIPV4, true), 
-        Settings->ServerPort, 
-        *SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4, true), 
-        Settings->ClientPort);
+    UE_LOG(OSCToolset, Log, TEXT("Server Address: %s | Server Port: %d"), 
+        *SetLocalIPAddress(Settings->ServerConfig.Address, Settings->UseLocalIPV4, true), 
+        Settings->ServerConfig.Port); 
+    
+    for (int32 i = 0; i < Settings->RemoteClients.Num(); i++)
+    {
+        const FOSCT_Network& Client = Settings->RemoteClients[i];
+        UE_LOG(OSCToolset, Log, TEXT("Client Address: %s | Client Port: %d"),
+                *SetLocalIPAddress(Client.Address, Settings->UseLocalIPV4, true),
+                Client.Port);
+    }
+    // for (UOSCClient* Client : OSCT_Clients)
+    // {
+    //     if (Client)
+    //     {
+    //         UE_LOG(OSCToolset, Log, TEXT("Client Address: %s | Client Port: %d"),
+    //             *SetLocalIPAddress(Settings->RemoteClients, Settings->UseLocalIPV4, true))
+    //     }
+    // }
+        // *SetLocalIPAddress(Settings->ClientAddress, Settings->UseLocalIPV4, true), 
+        // Settings->ClientPort);
+    
+    
 }
 
 void UOSCT_Master::ToggleOSCTMenu()
@@ -419,26 +472,47 @@ void UOSCT_Master::shutdown_OSCT_Master()
     // RemoveAllReceivers();
     
     OnShutdownOSCT.Broadcast();
-
-    if (IsValid(OSCT_Client))
-    {
-        FOSCAddress Addr = UOSCManager::ConvertStringToOSCAddress(OSCT_Shutdown_addr);
+    
+	for (UOSCClient* Client : OSCT_Clients)
+	{
+	    if (Client)
+	    {
+	        FOSCAddress Addr = UOSCManager::ConvertStringToOSCAddress(OSCT_Shutdown_addr);
         
-        // Always check if the address is valid before sending
-        if (!Addr.GetFullPath().IsEmpty())
-        {
-            FOSCMessage Msg;
-            UOSCManager::SetOSCMessageAddress(Msg, Addr);
+	        // Always check if the address is valid before sending
+	        if (!Addr.GetFullPath().IsEmpty())
+	        {
+	            FOSCMessage Msg;
+	            UOSCManager::SetOSCMessageAddress(Msg, Addr);
             
-            UOSCManager::AddString(Msg, TEXT("OSCT Shutdown"));
+	            UOSCManager::AddString(Msg, TEXT("OSCT Shutdown"));
 
-            OSCT_Client->SendOSCMessage(Msg);
-        }
-
-        // Do NOT call ConditionalBeginDestroy(). 
-        // Just null it; the Subsystem's death will handle the rest.
-        OSCT_Client = nullptr;
-    }
+	            Client->SendOSCMessage(Msg);
+	        }
+	    }
+	}
+    
+    OSCT_Clients.Empty();
+    
+    // if (IsValid(OSCT_Client))
+    // {
+    //     FOSCAddress Addr = UOSCManager::ConvertStringToOSCAddress(OSCT_Shutdown_addr);
+    //     
+    //     // Always check if the address is valid before sending
+    //     if (!Addr.GetFullPath().IsEmpty())
+    //     {
+    //         FOSCMessage Msg;
+    //         UOSCManager::SetOSCMessageAddress(Msg, Addr);
+    //         
+    //         UOSCManager::AddString(Msg, TEXT("OSCT Shutdown"));
+    //
+    //         OSCT_Client->SendOSCMessage(Msg);
+    //     }
+    //
+    //     // Do NOT call ConditionalBeginDestroy(). 
+    //     // Just null it; the Subsystem's death will handle the rest.
+    //     OSCT_Clients.Empty();
+    // }
 
     if (IsValid(OSCT_Server))
     {
@@ -470,68 +544,183 @@ void UOSCT_Master::ReSendAllReceiversStateUpdate()
         for (FOSCT_ReceiverLink& Link : Pair.Value)
         {
             // Example: UE_LOG(LogTemp, Log, TEXT("Key: %s | Link Data: %s"), *Pair.Key.ToString(), *Link.SomeProperty);
-            UOSCT_Functions::SendReceiverStateUpdate(OSCT_Client, Link.Data, Link.GetOwner(), true);
+            UOSCT_Functions::SendReceiverStateUpdate(OSCT_Clients, Link.Data, Link.GetOwner(), true);
         }
     }
 
 }
 
-bool UOSCT_Master::SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner)
+void UOSCT_Master::SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner)
 {
+    // Only run this logic if we haven't initialized yet
     if (Sender.FormattedAddress.IsEmpty())
     {
-        UOSCT_Functions::FormatAddress(
-            Sender.Role, 
-            ModuleType,
-            false,
-            Sender.Address,
-            Sender.FormattedAddress);
+        // 1. Generate the base string
+        UOSCT_Functions::FormatAddress(Sender.Role, ModuleType, false, Sender.Address, Sender.FormattedAddress);
         
+        // 2. The "/" Fix: Prepend if missing
+        if (!Sender.FormattedAddress.StartsWith(TEXT("/")))
+        {
+            Sender.FormattedAddress = TEXT("/") + Sender.FormattedAddress;
+        }
+
+        // 3. Bake the cache immediately
         Sender.CachedFullAddress = UOSCManager::ConvertStringToOSCAddress(Sender.FormattedAddress);
-        Sender.Type = UOSCT_Functions::ConvertModuleTypeToSenderType(ModuleType);
-        UE_LOG(OSCToolset, Log, TEXT("Added a new sender? %s"), *Sender.FormattedAddress)
-        UOSCT_Functions::SendSenderStateUpdate(OSCT_Client, Sender, Owner, true);
-        return true;
-    } 
-    return false;
+        Sender.ModuleType = ModuleType;
+
+        UE_LOG(OSCToolset, Log, TEXT("Initialized Sender: %s"), *Sender.FormattedAddress);
+        UOSCT_Functions::SendSenderStateUpdate(OSCT_Clients, Sender, Owner, true);
+    }
 }
 
 void UOSCT_Master::Send_Event(FOSCT_Sender& Sender, UObject* Owner)
 {
     SetupSender(Sender, EOSCT_ModuleType::EVENT, Owner);
-    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
     {
         float GameTime = GetWorld()->GetRealTimeSeconds();
         FOSCMessage Msg;
         UOSCManager::AddFloat(Msg, GameTime);
         UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
-        OSCT_Client->SendOSCMessage(Msg);
+        BroadcastOSC(Msg);
+        UOSCT_Functions::DebugSender(Sender, true);
+    }
+}
+
+void UOSCT_Master::Send_Bool(FOSCT_Sender& Sender, const bool Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::BOOL, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddBool(Msg, Value);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+        UOSCT_Functions::DebugSender(Sender, Value);
     }
 }
 
 void UOSCT_Master::Send_Float(FOSCT_Sender& Sender, const float Value, UObject* Owner)
 {
     SetupSender(Sender, EOSCT_ModuleType::FLOAT, Owner);
-    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
     {
         FOSCMessage Msg;
         UOSCManager::AddFloat(Msg, Value);
         UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
-        OSCT_Client->SendOSCMessage(Msg);
+        BroadcastOSC(Msg);
+        UOSCT_Functions::DebugSender(Sender, Value);
     }
+}
+
+void UOSCT_Master::Send_Integer(FOSCT_Sender& Sender, const int32 Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::INT, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddInt32(Msg, Value);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+        UOSCT_Functions::DebugSender(Sender, Value);
+    }
+}
+
+void UOSCT_Master::Send_Vector2(FOSCT_Sender& Sender, const FVector2D& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::VEC2, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value.X);
+        UOSCManager::AddFloat(Msg, Value.Y);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+        UOSCT_Functions::DebugSender(Sender, Value);
+    }
+}
+
+void UOSCT_Master::Send_Vector3(FOSCT_Sender& Sender, const FVector& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::VEC3, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value.X);
+        UOSCManager::AddFloat(Msg, Value.Y);
+        UOSCManager::AddFloat(Msg, Value.Z);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+        UOSCT_Functions::DebugSender(Sender, Value);
+    }
+}
+
+void UOSCT_Master::Send_Rotation(FOSCT_Sender& Sender, const FRotator& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::ROTATION, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value.Pitch);
+        UOSCManager::AddFloat(Msg, Value.Roll);
+        UOSCManager::AddFloat(Msg, Value.Yaw);
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+    }
+}
+
+void UOSCT_Master::Send_Color(FOSCT_Sender& Sender, const FLinearColor& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::COLOR, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value.R);
+        UOSCManager::AddFloat(Msg, Value.G);
+        UOSCManager::AddFloat(Msg, Value.B);
+        UOSCManager::AddFloat(Msg, Value.A);
+        
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+    }
+}
+
+void UOSCT_Master::Send_Transform(FOSCT_Sender& Sender, const FTransform& Value, UObject* Owner)
+{
+    SetupSender(Sender, EOSCT_ModuleType::TRANSFORM, Owner);
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    {
+        FOSCMessage Msg;
+        UOSCManager::AddFloat(Msg, Value.GetLocation().X);
+        UOSCManager::AddFloat(Msg, Value.GetLocation().Y);
+        UOSCManager::AddFloat(Msg, Value.GetLocation().Z);
+        
+        UOSCManager::AddFloat(Msg, Value.GetRotation().X);
+        UOSCManager::AddFloat(Msg, Value.GetRotation().Y);
+        UOSCManager::AddFloat(Msg, Value.GetRotation().Z);
+        
+        UOSCManager::AddFloat(Msg, Value.GetScale3D().X);
+        UOSCManager::AddFloat(Msg, Value.GetScale3D().Y);
+        UOSCManager::AddFloat(Msg, Value.GetScale3D().Z);
+        
+        UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
+        BroadcastOSC(Msg);
+    }
+
 }
 
 void UOSCT_Master::Send_String(FOSCT_Sender& Sender, const FString& Value, UObject* Owner)
 {
     SetupSender(Sender, EOSCT_ModuleType::STRING, Owner);
-    if (OSCT_Client && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
+    if (OSCT_Clients.Num() > 0 && !Sender.CachedFullAddress.GetFullPath().IsEmpty())
     {
         FOSCMessage Msg;
         UOSCManager::AddString(Msg, Value);
         UOSCManager::SetOSCMessageAddress(Msg, Sender.CachedFullAddress);
-        OSCT_Client->SendOSCMessage(Msg);
+        BroadcastOSC(Msg);
     }
 }
+
 
 bool UOSCT_Master::HandleCommands(const FOSCMessage& InMessage)
 {
@@ -580,6 +769,16 @@ void UOSCT_Master::RouteMessage(const FOSCMessage& InMessage, const FString& InA
             RouteOSCMessage<FOSCT_EventLink, bool>(InMessage, EventLinks, AddressToType, AddressKey,
             [](const FOSCMessage& M, bool& Out) { Out = true; return true; },
             [](UObject* Obj, const FOSCT_Receiver& D, bool V) { IOSCT_Router::Execute_GET_Event(Obj, D); });
+            break;
+        case EOSCT_RouteType::BOOL:
+            RouteOSCMessage<FOSCT_BoolLink, bool>(InMessage, BoolLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetBool,
+            &IOSCT_Router::Execute_GET_Boolean);
+            break;
+        case EOSCT_RouteType::INT:
+            RouteOSCMessage<FOSCT_IntegerLink, int32>(InMessage, IntegerLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetInteger,
+            &IOSCT_Router::Execute_GET_Integer);
             break;
         case EOSCT_RouteType::VEC2:
             RouteOSCMessage<FOSCT_Vector2Link, FVector2D>(InMessage, Vec2Links, AddressToType, AddressKey,
@@ -631,6 +830,16 @@ void UOSCT_Master::RouteMessage(const FOSCMessage& InMessage, const FString& InA
             RouteOSCMessage<FOSCT_EventPackLink, TMap<FString, bool>>(InMessage, EventPackLinks, AddressToType, AddressKey,
             &UOSCT_Parsing::TryGetEventPack,
             &IOSCT_Router::Execute_GET_Event_Pack);
+            break;
+        case EOSCT_RouteType::BOOL_PACK:
+            RouteOSCMessage<FOSCT_BoolPackLink, TMap<FString, bool>>(InMessage, BoolPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetEventPack,
+            &IOSCT_Router::Execute_GET_Boolean_Pack);
+            break;
+        case EOSCT_RouteType::INT_PACK:
+            RouteOSCMessage<FOSCT_IntegerPackLink, TMap<FString, int32>>(InMessage, IntegerPackLinks, AddressToType, AddressKey,
+            &UOSCT_Parsing::TryGetIntegerPack,
+            &IOSCT_Router::Execute_GET_Integer_Pack);
             break;
         case EOSCT_RouteType::VEC2_PACK:
             RouteOSCMessage<FOSCT_Vector2PackLink, TMap<FString, FVector2D>>(InMessage, Vec2PackLinks, AddressToType, AddressKey,
