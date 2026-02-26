@@ -39,7 +39,7 @@ public:
 	UOSCServer* OSCT_Server;
 
 	UPROPERTY(BlueprintReadOnly, Category = "OSCToolset")
-	UOSCClient* OSCT_Client;
+	TArray<UOSCClient*> OSCT_Clients;
 
 	////// RECEIVERS
 	
@@ -53,7 +53,7 @@ public:
 	void AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner);
 	
 	UFUNCTION()
-	void RemoveReceiver(FOSCT_Receiver Module, UObject* Owner);
+	void RemoveReceiver(FOSCT_Receiver Receiver, UObject* Owner);
 	
 	UFUNCTION()
 	void RemoveAllReceivers();
@@ -317,6 +317,9 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 		return true;
 	}
 	
+	UFUNCTION()
+	void BroadcastOSC(FOSCMessage& Message);
+	
 	UPROPERTY()
 	FString IPV4;
 
@@ -352,7 +355,7 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 
 	void InitializeOSC();
 
-	void SendOSCTBaseMessage(FString Message);
+	void SendOSCTBaseMessage(const FString& Message);
 
 	FString GetLocalIPAddress();
 

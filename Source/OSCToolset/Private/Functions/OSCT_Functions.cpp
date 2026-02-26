@@ -180,38 +180,43 @@ FOSCMessage UOSCT_Functions::CreateStateUpdate(
 	return Msg;
 }
 
-void UOSCT_Functions::SendReceiverStateUpdate(UOSCClient* Client, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting)
+void UOSCT_Functions::SendReceiverStateUpdate(const TArray<UOSCClient*>& Clients, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting)
 {
-	if (!Client || !Context) return;
-
-	FOSCMessage Msg = CreateStateUpdate(
-		Context,
-		Data.Address,
-		Data.FormattedAddress,
-		Data.Role,
-		Data.ModuleType,
-		Data.Pack,
-		bIsConnecting
-	);
-	Client->SendOSCMessage(Msg);
-	// UE_LOG(OSCToolset, Log, TEXT("Send Module Receiver State Update"));
+	for (UOSCClient* Client : Clients)
+	{
+		if (Client) {
+			FOSCMessage Msg = CreateStateUpdate(
+				Context,
+				Data.Address,
+				Data.FormattedAddress,
+				Data.Role,
+				Data.ModuleType,
+				Data.Pack,
+				bIsConnecting
+			);
+			Client->SendOSCMessage(Msg);
+		}
+	}
 }
 
-void UOSCT_Functions::SendSenderStateUpdate(UOSCClient* Client, const FOSCT_Sender& Data, UObject* Context,	bool bIsConnecting)
+void UOSCT_Functions::SendSenderStateUpdate(const TArray<UOSCClient*>& Clients, const FOSCT_Sender& Data, UObject* Context,	bool bIsConnecting)
 {
-	if (!Client || !Context) return;
-
-	FOSCMessage Msg = CreateStateUpdate(
-		Context,
-		Data.Address,
-		Data.FormattedAddress,
-		Data.Role,
-		Data.ModuleType,
-		false,
-		bIsConnecting
-	);
-	Client->SendOSCMessage(Msg);
-	// UE_LOG(OSCToolset, Log, TEXT("Send Module SENDER State Update"));
+	for (UOSCClient* Client : Clients)
+	{
+		if (Client)
+		{
+			FOSCMessage Msg = CreateStateUpdate(
+				Context,
+				Data.Address,
+				Data.FormattedAddress,
+				Data.Role,
+				Data.ModuleType,
+				false,
+				bIsConnecting
+			);
+			Client->SendOSCMessage(Msg);
+		}
+	}
 }
 
 FColor UOSCT_Functions::GetModuleDebugColor(const EOSCT_ModuleType& ModuleType)

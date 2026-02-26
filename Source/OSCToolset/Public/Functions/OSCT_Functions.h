@@ -82,9 +82,9 @@ public:
 		const bool bIsConnecting
 	);
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Networking")
-	static void SendReceiverStateUpdate(UOSCClient* Client, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting);
+	static void SendReceiverStateUpdate(const TArray<UOSCClient*>& Clients, const FOSCT_Receiver& Data, UObject* Context, bool bIsConnecting);
 	UFUNCTION(BlueprintCallable, Category = "OSCToolset|Networking")
-	static void SendSenderStateUpdate(UOSCClient* Client, const FOSCT_Sender& Data, UObject* Context, bool bIsConnecting);
+	static void SendSenderStateUpdate(const TArray<UOSCClient*>& Clients, const FOSCT_Sender& Data, UObject* Context, bool bIsConnecting);
 
 	
 	//Debug Template
