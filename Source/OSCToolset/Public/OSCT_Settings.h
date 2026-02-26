@@ -10,6 +10,19 @@
 /**
  * 
  */
+
+USTRUCT(BlueprintType)
+struct FOSCT_Network
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, Category = "OSCToolset|Network")
+	FString Address = TEXT("127.0.0.1");
+	
+	UPROPERTY(EditAnywhere, Category = "OSCToolset|Network")
+	int32 Port = 9990;
+};
+
 UCLASS(config = User, defaultconfig)
 class OSCTOOLSET_API UOSCT_Settings : public UObject
 {
@@ -18,21 +31,15 @@ class OSCTOOLSET_API UOSCT_Settings : public UObject
 public:
     UOSCT_Settings();
 
-
-	UPROPERTY(EditAnywhere, config, category = "OSCToolset|Server (Receive)")
-	FString ServerAddress;
-
-	UPROPERTY(EditAnywhere, config, category = "OSCToolset|Server (Receive)")
-	int ServerPort;
-
+	
+	UPROPERTY(EditAnywhere, config, Category = "OSCToolset|Server (Receive)")
+	FOSCT_Network ServerConfig;
+	
 	UPROPERTY(EditAnywhere, config, category = "OSCToolset|Server (Receive)")
 	bool MulticastLoopback;
-
-	UPROPERTY(EditAnywhere, config, category = "OSCToolset|Client (Send)")
-	FString ClientAddress;
-
-	UPROPERTY(EditAnywhere, config, category = "OSCToolset|Client (Send)")
-	int ClientPort;
+	
+	UPROPERTY(EditAnywhere, config, Category = "OSCToolset|Clients (Send)")
+	TArray<FOSCT_Network> RemoteClients;
 	
 	UPROPERTY(EditAnywhere, config, category = "OSCToolset")
 	bool UseLocalIPV4;
