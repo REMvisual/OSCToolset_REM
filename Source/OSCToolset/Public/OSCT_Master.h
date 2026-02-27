@@ -269,23 +269,18 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 			{
 				if (L.bNeedsInterpolation && L.Owner.IsValid())
 				{
-					// 1. Update values (The Snap happens inside here now)
 					L.Interpolate(DeltaTime, L.Data.Tick.InterpolationSpeed, L.Data.Tick.Tolerance);
-             
-					// 2. We check if the update caused it to settle
+
 					if (L.IsSettled(L.Data.Tick.Tolerance)) 
 					{
-						L.bNeedsInterpolation = false;
-						if (L.Data.Debug.PrintOnLog)
-						{
-							UE_LOG(OSCToolset, Warning, TEXT("The value has settled for %s"), *L.Data.Address)
-						}
+						L.CurrentValue = L.TargetValue; // Snap to final
+						L.bNeedsInterpolation = false; // Stop this specific link
 					}
 					else 
 					{
-						bOutStillMoving = true;
-						ExecuteFunc(L.Owner.Get(), L, L.CurrentValue);
+						bOutStillMoving = true; //modifies the bool bAnyLinkStillMoving = false; from master::Tick func.
 					}
+					ExecuteFunc(L.Owner.Get(), L, L.CurrentValue);
 				}
 			}
 		}

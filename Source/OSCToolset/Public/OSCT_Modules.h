@@ -187,7 +187,7 @@ static bool IsNearlyEqual(float A, float B, float Tolerance) {
 // For Rotators
 static bool IsNearlyEqual(const FRotator& A, const FRotator& B, float Tolerance) {
 	// This handles the 0-360 wrapping correctly
-	return (A - B).GetNormalized().IsNearlyZero(Tolerance);
+	return A.Quaternion().Equals(B.Quaternion(), Tolerance);
 }
 template<typename T>
 struct TOSCT_LinkBase
