@@ -91,6 +91,7 @@ void UOSCT_Master::AddReceiver(FOSCT_Receiver Receiver, UObject* Owner)
         default:
             break;
         }
+        AddReceiverLink(ReceiverMap, AddressKey, Receiver, Owner); //The global receiver map
         IOSCT_Router::Execute_OnReceiverAdded(Owner, Receiver);
         UOSCT_Functions::SendReceiverStateUpdate(OSCT_Clients, Receiver, Owner, true);
         
@@ -221,6 +222,7 @@ void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Receiver, UObject* Owner)
                 UE_LOG(OSCToolset, Warning, TEXT("Did not implement removing the receiver for this type: %s"), *Receiver.FormattedAddress);
                 break;
             }
+            RemoveReceiverLink(ReceiverMap, AddressToType, AddressKey, Owner);
             UOSCT_Functions::SendReceiverStateUpdate(OSCT_Clients, Receiver, Owner, false);
             UE_LOG(OSCToolset, Log, TEXT("Unregistered OSCT Receiver: %s"), *Receiver.FormattedAddress);
         }
@@ -335,6 +337,8 @@ void UOSCT_Master::CleanupLinks()
     StringPackLinks.Empty();
     NoteLinks.Empty();
     
+    ReceiverMap.Empty();
+    AddressToType.Empty();
     TickableAddresses.Empty();
 }
 
