@@ -21,13 +21,11 @@ The example files can be purchased in my website:
 
  
 # Bindings
+## [OSCToolset-TouchDesigner](https://www.eusebijucgla.com/tools/osctoolset/touchdesigner/)
 If you want to use TouchDesigner together with OSCToolset, I recommend you to see my OSCToolset-TouchDesigner component, which will make your life much easier in TouchDesigner:
 
-[OSCToolset-TouchDesigner](https://www.eusebijucgla.com/tools/osctoolset/touchdesigner/)
-
-I am also working on an Ableton bindig which you can get updates for when it is finshed here:
-[OSCToolset-Ableton](https://www.eusebijucgla.com/updates/tools/osctoolset/ableton)
-
+## [OSCToolset-Ableton](https://www.eusebijucgla.com/updates/tools/osctoolset/ableton)
+I am also working on an Ableton bindig which you can get updates for when it is finshed here.
 
 # Downloads
 I provide the latest 3 Unreal Engine versions build for Windows. But you can package this Plugin for MacOS or Linux if you hve the machine to do so.
