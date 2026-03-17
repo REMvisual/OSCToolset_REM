@@ -2,11 +2,40 @@ OSCToolset is a runtime plugin that simplifies the [OSC](https://dev.epicgames.c
 
 The main design principles are simplicity and modularity. The user creates and sends a properly formatted address and the rest is handled by the Plugin itself. That includes:
 
-- Data driven modules (receivers and senders)
-- Value parsing.
-- Tick interpolation.
-- Automatic routing.
-- Debuging
+- Managed Server and Client lifecycle
+- Modules
+    - Receivers
+        - Packs
+        - Tick interpolation
+    - Senders
+    - Debug
+- Router
 - Filtering
+- Runtime settings menu
 
-If you are interested you can read more in the [[docs]].
+If you are interested you can read more in the [docs](https://www.eusebijucgla.com/tools/osctoolset/docs/).
+
+# Example Files
+The example files can be purchased in my website:
+- [OSCT-Examples-Basic](https://www.eusebijucgla.com/tools/osctoolset/unrealengine/)
+
+ 
+# Bindings
+If you want to use TouchDesigner together with OSCToolset, I recommend you to see my OSCToolset-TouchDesigner component, which will make your life much easier in TouchDesigner:
+
+[OSCToolset-TouchDesigner](https://www.eusebijucgla.com/tools/osctoolset/touchdesigner/)
+
+I am also working on an Ableton bindig which you can get updates for when it is finshed here:
+[OSCToolset-Ableton](https://www.eusebijucgla.com/updates/tools/osctoolset/ableton)
+
+
+# Downloads
+I provide the latest 3 Unreal Engine versions build for Windows. But you can package this Plugin for MacOS or Linux if you hve the machine to do so.
+
+From this repository releases:
+- [Releases](https://github.com/eusebijucgla/OSCToolset/releases)
+
+Or download them from my website:
+- [OSCToolset](https://www.eusebijucgla.com/tools/osctoolset/unrealengine/)
+
+- Gives access to [discord](https://www.eusebijucgla.com/tools/osctoolset/unrealengine/discord)
