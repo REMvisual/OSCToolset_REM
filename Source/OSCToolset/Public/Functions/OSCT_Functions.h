@@ -69,6 +69,19 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="OSCToolset")
 	static bool FormatAddress(const EOSCT_Role& Role, const EOSCT_ModuleType& ModuleType, const bool bPack, const FString& Address, FString& OutAddress);
+
+	/**
+	 * Shared address filter used by the OSC Get Values node and Add Receivers From Data Table.
+	 * Empty Filter = matches everything. Otherwise the Filter is split on whitespace into OR-ed terms;
+	 * a term with '*' is a case-insensitive wildcard, a term without '*' must match the Address exactly (case-insensitive).
+	 * e.g. AddressPassesFilter("KnobA1", "Knob* Main") == true.
+	 */
+	UFUNCTION(BlueprintCallable, Category="OSCToolset|Filters")
+	static bool AddressPassesFilter(const FString& Address, const FString& Filter);
+
+	/** Returns a Receiver's short Address (the routing key the OSC Switch Values node compares against). */
+	UFUNCTION(BlueprintPure, Category="OSCToolset")
+	static FString GetReceiverAddress(const FOSCT_Receiver& Receiver);
 	// static bool FormatAddress(const FOSCT_Module& Module, FString& OutAddress);
 	
 	UFUNCTION()

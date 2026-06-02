@@ -23,6 +23,28 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOSCTInit);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnOSCTShutdown);
 
+/**
+ * Pure, subsystem-free lookup of a link's LIVE value for a given Owner.
+ * Kept free + static so it can be unit-tested with hand-built link arrays (no world/subsystem needed).
+ *
+ * Important: for non-interpolated receivers (Tick.bEnable == false) only TargetValue is updated per message —
+ * CurrentValue is frozen at the first value. So we read TargetValue (raw latest) unless interpolation is on,
+ * in which case CurrentValue is the live, smoothed value driven by the subsystem tick.
+ */
+template<typename TLink, typename T>
+static bool OSCT_FindLiveValue(const TArray<TLink>& Links, const UObject* Owner, T& Out)
+{
+	for (const TLink& L : Links)
+	{
+		if (L.HasValidOwner() && L.GetOwner() == Owner)
+		{
+			Out = L.Data.Tick.bEnable ? L.CurrentValue : L.TargetValue;
+			return true;
+		}
+	}
+	return false;
+}
+
 UCLASS()                  
 class OSCTOOLSET_API UOSCT_Master : public UGameInstanceSubsystem, public FTickableGameObject
 {
@@ -50,14 +72,30 @@ public:
 	void AddManyReceivers(TArray<FOSCT_Receiver> Receivers, UObject* Owner);
 	
 	UFUNCTION()
-	void AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner);
+	void AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner, const FString& AddressFilter = TEXT(""));
 	
 	UFUNCTION()
 	void RemoveReceiver(FOSCT_Receiver Receiver, UObject* Owner);
 	
 	UFUNCTION()
 	void RemoveAllReceivers();
-	
+
+	////// LIVE VALUE ACCESS
+	// Read the live (interpolated) CurrentValue for a formatted-address key + owner.
+	// Returns false if no matching receiver is registered yet (e.g. before lazy-register / first message).
+	bool TryGetFloatValue(const FName& Key, const UObject* Owner, float& Out);
+	bool TryGetIntValue(const FName& Key, const UObject* Owner, int32& Out);
+	bool TryGetVector2Value(const FName& Key, const UObject* Owner, FVector2D& Out);
+	bool TryGetVector3Value(const FName& Key, const UObject* Owner, FVector& Out);
+	bool TryGetRotationValue(const FName& Key, const UObject* Owner, FRotator& Out);
+	bool TryGetColorValue(const FName& Key, const UObject* Owner, FLinearColor& Out);
+	bool TryGetTransformValue(const FName& Key, const UObject* Owner, FTransform& Out);
+	bool TryGetBoolValue(const FName& Key, const UObject* Owner, bool& Out);
+	bool TryGetStringValue(const FName& Key, const UObject* Owner, FString& Out);
+
+	// True if a receiver for this key+owner is already registered (used to gate lazy-register so we don't re-send TD state updates).
+	bool HasReceiverFor(const FName& Key, const UObject* Owner) const;
+
 	////// SENDERS
 	UFUNCTION()
 	void SetupSender(FOSCT_Sender& Sender, const EOSCT_ModuleType ModuleType, UObject* Owner);
@@ -242,11 +280,13 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 						if (!Target) continue;
 
 						ExecFunc(Target, Link.Data, ParsedValue);
+						IOSCT_Router::Execute_GET_All(Target, Link.Data); // universal event — EVERY type flows through here
 						UOSCT_Functions::DebugReceiverLink(Link, ParsedValue);
-						
+
 						if (TickFunc && Link.bIsFirstFrame)
 						{
 							TickFunc(Target, Link.Data, Link.CurrentValue);
+							IOSCT_Router::Execute_GET_All_Tick(Target, Link.Data);
 							Link.bIsFirstFrame = false; // Gate closed forever
 						}
 					}
@@ -281,6 +321,7 @@ TArray<TLink>* UpdateAndPrune(TMap<FName, TArray<TLink>>& TargetMap,
 						bOutStillMoving = true; //modifies the bool bAnyLinkStillMoving = false; from master::Tick func.
 					}
 					ExecuteFunc(L.Owner.Get(), L, L.CurrentValue);
+					IOSCT_Router::Execute_GET_All_Tick(L.Owner.Get(), L.Data); // universal tick event
 				}
 			}
 		}

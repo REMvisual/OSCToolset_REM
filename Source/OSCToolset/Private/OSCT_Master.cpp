@@ -114,7 +114,7 @@ void UOSCT_Master::AddManyReceivers(TArray<FOSCT_Receiver> Receivers, UObject* O
     }
 }
 
-void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner)
+void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner, const FString& AddressFilter)
 {
     if (!InTable)
     {
@@ -128,10 +128,10 @@ void UOSCT_Master::AddReceiversFromDataTable(UDataTable* InTable, UObject* Owner
         static const FString ContextString(TEXT("OSCT Receiver Rows"));
         TArray<FOSCT_ReceiverRow*> Rows;
         InTable->GetAllRows<FOSCT_ReceiverRow>(ContextString, Rows);
-        
+
         for (FOSCT_ReceiverRow* RowData: Rows)
         {
-            if (RowData)
+            if (RowData && UOSCT_Functions::AddressPassesFilter(RowData->Address, AddressFilter))
             {
                 FOSCT_Receiver NewReceiver(*RowData);
                 AddReceiver(NewReceiver, Owner);
@@ -231,8 +231,71 @@ void UOSCT_Master::RemoveReceiver(FOSCT_Receiver Receiver, UObject* Owner)
 
 void UOSCT_Master::RemoveAllReceivers()
 {
-    CleanupLinks();    
+    CleanupLinks();
     UE_LOG(OSCToolset, Log, TEXT("Removed all receivers."));
+}
+
+////// LIVE VALUE ACCESS
+bool UOSCT_Master::TryGetFloatValue(const FName& Key, const UObject* Owner, float& Out)
+{
+    if (const TArray<FOSCT_FloatLink>* Links = FloatLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetIntValue(const FName& Key, const UObject* Owner, int32& Out)
+{
+    if (const TArray<FOSCT_IntegerLink>* Links = IntegerLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetVector2Value(const FName& Key, const UObject* Owner, FVector2D& Out)
+{
+    if (const TArray<FOSCT_Vector2Link>* Links = Vec2Links.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetVector3Value(const FName& Key, const UObject* Owner, FVector& Out)
+{
+    if (const TArray<FOSCT_Vector3Link>* Links = Vec3Links.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetRotationValue(const FName& Key, const UObject* Owner, FRotator& Out)
+{
+    if (const TArray<FOSCT_RotationLink>* Links = RotationLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetColorValue(const FName& Key, const UObject* Owner, FLinearColor& Out)
+{
+    if (const TArray<FOSCT_ColorLink>* Links = ColorLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetTransformValue(const FName& Key, const UObject* Owner, FTransform& Out)
+{
+    if (const TArray<FOSCT_TransformLink>* Links = TransformLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetBoolValue(const FName& Key, const UObject* Owner, bool& Out)
+{
+    if (const TArray<FOSCT_BoolLink>* Links = BoolLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::TryGetStringValue(const FName& Key, const UObject* Owner, FString& Out)
+{
+    if (const TArray<FOSCT_StringLink>* Links = StringLinks.Find(Key))
+        return OSCT_FindLiveValue(*Links, Owner, Out);
+    return false;
+}
+bool UOSCT_Master::HasReceiverFor(const FName& Key, const UObject* Owner) const
+{
+    if (const TArray<FOSCT_ReceiverLink>* Links = ReceiverMap.Find(Key))
+        for (const FOSCT_ReceiverLink& L : *Links)
+            if (L.HasValidOwner() && L.GetOwner() == Owner) return true;
+    return false;
 }
 
 void UOSCT_Master::Initialize(FSubsystemCollectionBase& Collection)
