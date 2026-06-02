@@ -34,7 +34,14 @@ public:
 	void OnReceiverRemoved(const FOSCT_Receiver& Receiver);
 	
 	//Receivers
-	
+
+	// All — fires for ANY registered receiver type (float, vector, transform, string, note, event, packs…).
+	// No value, just the Receiver. Pair with OSC Switch Values to handle many types through one event.
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|All")
+	void GET_All(const FOSCT_Receiver& Receiver);
+	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|All")
+	void GET_All_Tick(const FOSCT_Receiver& Receiver);
+
 	// Event
 	UFUNCTION(BlueprintNativeEvent, Category="OSCToolset|Receivers|Event")
 	void GET_Event(const FOSCT_Receiver& Receiver);

@@ -2,3 +2,21 @@ Binaries
 Intermediate
 Saved
 DerivedDataCache
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+
+# Packaged plugin output (built via RunUAT BuildPlugin)
+PACKAGED/
+
+# Dev tooling — keep the public fork clean
+.beads/
+.claude/
+.openviking/
+ov.conf
+.notion-release
+CLAUDE.md
+AGENTS.md

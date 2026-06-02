@@ -145,6 +145,32 @@ bool UOSCT_Functions::FormatAddress(const EOSCT_Role& Role, const EOSCT_ModuleTy
 	return true;
 }
 
+FString UOSCT_Functions::GetReceiverAddress(const FOSCT_Receiver& Receiver)
+{
+	return Receiver.Address;
+}
+
+bool UOSCT_Functions::AddressPassesFilter(const FString& Address, const FString& Filter)
+{
+	TArray<FString> Terms;
+	Filter.ParseIntoArrayWS(Terms);
+	if (Terms.Num() == 0) return true; // no filter = match all
+
+	for (const FString& Term : Terms)
+	{
+		if (Term.IsEmpty()) continue;
+		if (Term.Contains(TEXT("*")))
+		{
+			if (Address.MatchesWildcard(Term, ESearchCase::IgnoreCase)) return true;
+		}
+		else if (Address.Equals(Term, ESearchCase::IgnoreCase))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 FOSCMessage UOSCT_Functions::CreateStateUpdate(
 	UObject* Context,
 	const FString& Address,
