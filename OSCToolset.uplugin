@@ -1,11 +1,11 @@
 {
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0.0",
+	"Version": 3,
+	"VersionName": "1.0.2",
 	"FriendlyName": "OSCToolset",
-	"Description": "A runtime plugin that simplifies the OSC workflow in Unreal Engine. REM Edition adds the DataTable Switch and OSC Switch Values Blueprint nodes, per-address value getters, and a universal GET_All router event.",
+	"Description": "A runtime plugin that simplifies the OSC workflow in Unreal Engine. REM Edition adds the OSC Switch Values Blueprint node, per-address value getters, and a universal GET_All router event.",
 	"Category": "",
-	"CreatedBy": "Eusebi Jucgla (OSCToolset), REM (DataTable Switch)",
+	"CreatedBy": "Eusebi Jucgla (OSCToolset), REM (REM Edition)",
 	"CreatedByURL": "https://www.eusebijucgla.com/",
 	"DocsURL": "https://www.eusebijucgla.com/tools/osctoolset/unrealengine",
 	"MarketplaceURL": "",
@@ -19,14 +19,6 @@
 			"Name": "OSCToolset",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
-			"PlatformAllowList": [
-				"Win64"
-			]
-		},
-		{
-			"Name": "DataTableSwitchEditor",
-			"Type": "UncookedOnly",
-			"LoadingPhase": "PostEngineInit",
 			"PlatformAllowList": [
 				"Win64"
 			]

@@ -25,7 +25,6 @@ This is a fork (REMvisual) that adds Blueprint-facing tooling on top of OSCTools
 
 - **OSC Switch Values** — the headline node. Drive it from any `GET_*` OSCT Router event (especially the new `GET_All`) by wiring that event's exec + `Receiver`. Declare a set of addresses (inline list and/or an `FOSCT_ReceiverRow` DataTable + filter, set in the **Details** panel). For each address you get **both** an exec output (routed when that address changes, like a switch) **and** a typed value pin with its live value — float, vector, transform, color, bool, string, etc. Plus a `Default` exec.
 - **Add Receivers From Data Table** — registers receivers for the owning actor from a DataTable with an optional address filter. Table + Filter are available as input pins (wire variables for a procedural setup) or in Details. Drive from BeginPlay.
-- **DataTable Switch** — a generic "Switch on DataTable" node that auto-populates its case pins from a DataTable's row names or a chosen column. Not OSC-specific.
 
 ## Functions
 

@@ -26,6 +26,73 @@ UK2Node_OSCSwitchValues::UK2Node_OSCSwitchValues(const FObjectInitializer& Objec
 	bIncludeDefault = true;
 }
 
+void UK2Node_OSCSwitchValues::RebindDataTableHandler()
+{
+	if (BoundDataTable && BoundDataTable != AddressTable)
+	{
+		BoundDataTable->OnDataTableChanged().RemoveAll(this);
+		BoundDataTable = nullptr;
+		bDataTableChangeHandlerBound = false;
+	}
+	if (AddressTable && !bDataTableChangeHandlerBound)
+	{
+		AddressTable->OnDataTableChanged().AddUObject(this, &UK2Node_OSCSwitchValues::HandleDataTableChanged);
+		BoundDataTable = AddressTable;
+		bDataTableChangeHandlerBound = true;
+	}
+}
+
+void UK2Node_OSCSwitchValues::HandleDataTableChanged()
+{
+	RefreshCachedEntries();
+	ReconstructNode();
+}
+
+void UK2Node_OSCSwitchValues::PostInitProperties()
+{
+	Super::PostInitProperties();
+	if (!HasAnyFlags(RF_ClassDefaultObject | RF_NeedLoad))
+	{
+		RebindDataTableHandler();
+	}
+}
+
+void UK2Node_OSCSwitchValues::PostLoad()
+{
+	Super::PostLoad();
+	// IMPORTANT: do NOT read AddressTable here. During load the referenced DataTable's RowStruct/rows are
+	// frequently not deserialized yet (proven via logs: hasRowStruct=0, rawRows=0 on early passes), and load
+	// order between this node and the table is not guaranteed. Reading it would yield zero entries and wipe the
+	// snapshot, dropping the case pins / raising "has no addresses" on compile-on-load.
+	//
+	// The serialized CachedEntries IS the source of truth at load. If it's empty (asset saved before this field
+	// existed, or wiped by the earlier buggy refresh), rebuild it from the node's own persisted case pins —
+	// those are serialized with the node, so this is fully timing-independent and auto-heals old assets.
+	if (CachedEntries.Num() == 0)
+	{
+		DeriveCachedEntriesFromPins();
+	}
+	RebindDataTableHandler();
+}
+
+void UK2Node_OSCSwitchValues::PostPasteNode()
+{
+	Super::PostPasteNode();
+	RefreshCachedEntries();
+	RebindDataTableHandler();
+}
+
+void UK2Node_OSCSwitchValues::BeginDestroy()
+{
+	if (BoundDataTable && bDataTableChangeHandlerBound)
+	{
+		BoundDataTable->OnDataTableChanged().RemoveAll(this);
+		BoundDataTable = nullptr;
+		bDataTableChangeHandlerBound = false;
+	}
+	Super::BeginDestroy();
+}
+
 FName UK2Node_OSCSwitchValues::FunctionNameForType(EOSCT_ModuleType Type)
 {
 	switch (Type)
@@ -86,8 +153,9 @@ bool UK2Node_OSCSwitchValues::MakePinType(EOSCT_ModuleType Type, FEdGraphPinType
 	}
 }
 
-void UK2Node_OSCSwitchValues::CollectEntries(TArray<FOSCSwitchEntry>& Out) const
+void UK2Node_OSCSwitchValues::ResolveEntries(TArray<FOSCT_NodeAddress>& Out) const
 {
+	Out.Reset();
 	TSet<FString> Seen;
 
 	auto TryAdd = [&](const FString& Address, EOSCT_ModuleType Type)
@@ -97,17 +165,13 @@ void UK2Node_OSCSwitchValues::CollectEntries(TArray<FOSCSwitchEntry>& Out) const
 		if (Seen.Contains(Lower)) return;
 		Seen.Add(Lower);
 
-		FEdGraphPinType Dummy;
-		FOSCSwitchEntry Entry;
-		Entry.Address = Address;
-		Entry.Type = Type;
-		Entry.ExecPinName = FName(*Address);
-		Entry.bHasValue = MakePinType(Type, Dummy);
-		Entry.ValuePinName = Entry.bHasValue ? FName(*(Address + TEXT("_Value"))) : NAME_None;
-		Out.Add(Entry);
+		FOSCT_NodeAddress E;
+		E.Address = Address;
+		E.Type = Type;
+		Out.Add(E);
 	};
 
-	if (AddressTable && AddressTable->RowStruct && AddressTable->RowStruct->IsChildOf(FOSCT_ReceiverRow::StaticStruct()))
+	if (AddressTable && AddressTable->GetRowStruct() && AddressTable->GetRowStruct()->IsChildOf(FOSCT_ReceiverRow::StaticStruct()))
 	{
 		static const FString Context(TEXT("OSCSwitchValues Rows"));
 		TArray<FOSCT_ReceiverRow*> Rows;
@@ -124,6 +188,126 @@ void UK2Node_OSCSwitchValues::CollectEntries(TArray<FOSCSwitchEntry>& Out) const
 	for (const FOSCT_NodeAddress& A : Addresses)
 	{
 		TryAdd(A.Address, A.Type);
+	}
+}
+
+void UK2Node_OSCSwitchValues::RefreshCachedEntries()
+{
+	TArray<FOSCT_NodeAddress> Resolved;
+	ResolveEntries(Resolved);
+
+	if (Resolved.Num() > 0)
+	{
+		CachedEntries = MoveTemp(Resolved);
+		return;
+	}
+
+	// Resolve came back empty. Decide whether that's authoritative or just a not-yet-loaded table:
+	//  - No source configured at all (no table, no inline) -> genuinely empty, clear the cache.
+	//  - Table is assigned AND readable (RowStruct valid) -> the rows/filter legitimately yield nothing, clear.
+	//  - Table is assigned but NOT readable yet (RowStruct null = mid-load) -> KEEP the snapshot; wiping it
+	//    here is exactly the load-order race that dropped the case pins.
+	const bool bHasConfiguredSource = (AddressTable != nullptr) || (Addresses.Num() > 0);
+	const bool bTableReadable = (AddressTable != nullptr) && (AddressTable->GetRowStruct() != nullptr);
+	const bool bOnlyTableSource = (AddressTable != nullptr) && (Addresses.Num() == 0);
+
+	if (!bHasConfiguredSource || bTableReadable || !bOnlyTableSource)
+	{
+		CachedEntries.Reset();
+	}
+	// else: table assigned but not loaded yet -> preserve CachedEntries
+}
+
+EOSCT_ModuleType UK2Node_OSCSwitchValues::ModuleTypeFromPinType(const FEdGraphPinType& PinType)
+{
+	const FName Cat = PinType.PinCategory;
+	if (Cat == UEdGraphSchema_K2::PC_Real)    return EOSCT_ModuleType::FLOAT;
+	if (Cat == UEdGraphSchema_K2::PC_Int)     return EOSCT_ModuleType::INT;
+	if (Cat == UEdGraphSchema_K2::PC_Boolean) return EOSCT_ModuleType::BOOL;
+	if (Cat == UEdGraphSchema_K2::PC_String)  return EOSCT_ModuleType::STRING;
+	if (Cat == UEdGraphSchema_K2::PC_Struct)
+	{
+		const UScriptStruct* S = Cast<UScriptStruct>(PinType.PinSubCategoryObject.Get());
+		if (S == TBaseStructure<FVector2D>::Get())    return EOSCT_ModuleType::VEC2;
+		if (S == TBaseStructure<FVector>::Get())       return EOSCT_ModuleType::VEC3;
+		if (S == TBaseStructure<FRotator>::Get())      return EOSCT_ModuleType::ROTATION;
+		if (S == TBaseStructure<FLinearColor>::Get())  return EOSCT_ModuleType::COLOR;
+		if (S == TBaseStructure<FTransform>::Get())    return EOSCT_ModuleType::TRANSFORM;
+	}
+	return EOSCT_ModuleType::EVENT; // exec-only (also covers NOTE)
+}
+
+void UK2Node_OSCSwitchValues::DeriveCachedEntriesFromPins()
+{
+	// Reconstruct the resolved address set from the node's own persisted case pins. Each address has an exec
+	// output pin named after the address, and (for valued types) a sibling "<Address>_Value" pin whose type
+	// recovers the EOSCT_ModuleType. This is serialized with the node, so it's available regardless of whether
+	// the AddressTable asset has finished loading — the timing-independent safety net / migration path.
+	TArray<FOSCT_NodeAddress> Derived;
+	TSet<FString> Seen;
+	for (const UEdGraphPin* Pin : Pins)
+	{
+		if (!Pin || Pin->Direction != EGPD_Output) continue;
+		if (Pin->PinType.PinCategory != UEdGraphSchema_K2::PC_Exec) continue;
+		if (Pin->PinName == DefaultPinName) continue;
+
+		const FString Address = Pin->PinName.ToString();
+		if (Address.IsEmpty()) continue;
+		const FString Lower = Address.ToLower();
+		if (Seen.Contains(Lower)) continue;
+		Seen.Add(Lower);
+
+		EOSCT_ModuleType Type = EOSCT_ModuleType::EVENT;
+		const FName ValueName(*(Address + TEXT("_Value")));
+		for (const UEdGraphPin* ValPin : Pins)
+		{
+			if (ValPin && ValPin->Direction == EGPD_Output && ValPin->PinName == ValueName)
+			{
+				Type = ModuleTypeFromPinType(ValPin->PinType);
+				break;
+			}
+		}
+
+		FOSCT_NodeAddress E;
+		E.Address = Address;
+		E.Type = Type;
+		Derived.Add(E);
+	}
+
+	if (Derived.Num() > 0)
+	{
+		CachedEntries = MoveTemp(Derived);
+	}
+}
+
+void UK2Node_OSCSwitchValues::CollectEntries(TArray<FOSCSwitchEntry>& Out) const
+{
+	// Build pins from the SERIALIZED snapshot so the case pins are identical across reconstruction even when
+	// the AddressTable asset isn't loaded at that moment (the cause of exec links dropping on load/Play).
+	// Fall back to a live resolve only when the cache is empty — freshly created nodes and pre-fix assets
+	// before their first PostLoad refresh.
+	TArray<FOSCT_NodeAddress> Source = CachedEntries;
+	if (Source.Num() == 0)
+	{
+		ResolveEntries(Source);
+	}
+
+	TSet<FString> Seen;
+	for (const FOSCT_NodeAddress& A : Source)
+	{
+		if (A.Address.IsEmpty()) continue;
+		const FString Lower = A.Address.ToLower();
+		if (Seen.Contains(Lower)) continue;
+		Seen.Add(Lower);
+
+		FEdGraphPinType Dummy;
+		FOSCSwitchEntry Entry;
+		Entry.Address = A.Address;
+		Entry.Type = A.Type;
+		Entry.ExecPinName = FName(*A.Address);
+		Entry.bHasValue = MakePinType(A.Type, Dummy);
+		Entry.ValuePinName = Entry.bHasValue ? FName(*(A.Address + TEXT("_Value"))) : NAME_None;
+		Out.Add(Entry);
 	}
 }
 
@@ -329,6 +513,11 @@ void UK2Node_OSCSwitchValues::PostEditChangeProperty(FPropertyChangedEvent& Prop
 		PropName == GET_MEMBER_NAME_CHECKED(UK2Node_OSCSwitchValues, bIncludeDefault) ||
 		PropertyChangedEvent.GetMemberPropertyName() == GET_MEMBER_NAME_CHECKED(UK2Node_OSCSwitchValues, Addresses))
 	{
+		if (PropName == GET_MEMBER_NAME_CHECKED(UK2Node_OSCSwitchValues, AddressTable))
+		{
+			RebindDataTableHandler();
+		}
+		RefreshCachedEntries();
 		ReconstructNode();
 	}
 }

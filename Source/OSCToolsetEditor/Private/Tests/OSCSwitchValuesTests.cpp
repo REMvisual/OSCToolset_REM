@@ -166,6 +166,130 @@ bool FOSCSwitchValuesMultiValueInline::RunTest(const FString&)
 	return true;
 }
 
+// Regression (the reported bug): table-derived case pins lost their wired connections on load/Play.
+// Cause: pins were resolved LIVE from AddressTable during reconstruction, but the table asset isn't
+// guaranteed available at that moment, so the pins (and their links) vanished. The serialized
+// CachedEntries snapshot must keep the pins even when the live table is momentarily unavailable.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FOSCSwitchValuesCachedPinsSurviveTableUnavailable,
+	"OSCToolset.Editor.SwitchValues.TablePinsSurviveReconstructWithoutTable",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FOSCSwitchValuesCachedPinsSurviveTableUnavailable::RunTest(const FString&)
+{
+	using namespace OSCSwitchValuesTestHelpers;
+
+	UDataTable* DT = NewObject<UDataTable>(GetTransientPackage());
+	DT->RowStruct = FOSCT_ReceiverRow::StaticStruct();
+	{ FOSCT_ReceiverRow R; R.Address = TEXT("KnobA1"); R.ModuleType = EOSCT_ModuleType::FLOAT; DT->AddRow(FName(TEXT("KnobA1")), R); }
+	{ FOSCT_ReceiverRow R; R.Address = TEXT("LFO1");   R.ModuleType = EOSCT_ModuleType::FLOAT; DT->AddRow(FName(TEXT("LFO1")), R); }
+
+	UK2Node_OSCSwitchValues* Node = NewObject<UK2Node_OSCSwitchValues>(GetTransientPackage());
+	Node->AddressTable = DT;
+	Node->AddressFilter = TEXT("KnobA1");
+	// Simulates PostLoad capturing the snapshot while the table IS available.
+	Node->RefreshCachedEntries();
+
+	// Simulate a reconstruction where the AddressTable asset isn't available yet (load/compile-on-load).
+	Node->AddressTable = nullptr;
+	Node->AllocateDefaultPins();
+
+	TestNotNull(TEXT("KnobA1 exec out survives table-unavailable reconstruct"),
+		FindPin(Node, FName(TEXT("KnobA1")), EGPD_Output));
+	TestNotNull(TEXT("KnobA1 value out survives table-unavailable reconstruct"),
+		FindPin(Node, FName(TEXT("KnobA1_Value")), EGPD_Output));
+	TestNull(TEXT("LFO1 still filtered out of the cache"),
+		FindPin(Node, FName(TEXT("LFO1")), EGPD_Output));
+	return true;
+}
+
+// RefreshCachedEntries snapshots inline + filtered-table addresses (deduped).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FOSCSwitchValuesRefreshCache,
+	"OSCToolset.Editor.SwitchValues.RefreshCachedEntriesSnapshotsAddresses",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FOSCSwitchValuesRefreshCache::RunTest(const FString&)
+{
+	UDataTable* DT = NewObject<UDataTable>(GetTransientPackage());
+	DT->RowStruct = FOSCT_ReceiverRow::StaticStruct();
+	{ FOSCT_ReceiverRow R; R.Address = TEXT("KnobA1"); R.ModuleType = EOSCT_ModuleType::FLOAT; DT->AddRow(FName(TEXT("KnobA1")), R); }
+	{ FOSCT_ReceiverRow R; R.Address = TEXT("LFO1");   R.ModuleType = EOSCT_ModuleType::FLOAT; DT->AddRow(FName(TEXT("LFO1")), R); }
+
+	UK2Node_OSCSwitchValues* Node = NewObject<UK2Node_OSCSwitchValues>(GetTransientPackage());
+	Node->AddressTable = DT;
+	Node->AddressFilter = TEXT("Knob*");
+	Node->Addresses = { SV_Addr(TEXT("Tint"), EOSCT_ModuleType::COLOR) };
+	Node->RefreshCachedEntries();
+
+	// KnobA1 (table, passes filter) + Tint (inline) = 2; LFO1 filtered out.
+	TestEqual(TEXT("cache holds 2 entries"), Node->CachedEntries.Num(), 2);
+	bool bHasKnob = false, bHasTint = false, bHasLFO = false;
+	for (const FOSCT_NodeAddress& E : Node->CachedEntries)
+	{
+		if (E.Address == TEXT("KnobA1")) bHasKnob = true;
+		if (E.Address == TEXT("Tint"))   bHasTint = true;
+		if (E.Address == TEXT("LFO1"))   bHasLFO  = true;
+	}
+	TestTrue(TEXT("KnobA1 cached"), bHasKnob);
+	TestTrue(TEXT("Tint cached"), bHasTint);
+	TestFalse(TEXT("LFO1 not cached"), bHasLFO);
+	return true;
+}
+
+// Migration / load-race safety net: the cache can be rebuilt from the node's own persisted pins, recovering
+// each address AND its type — so case pins survive even when the AddressTable asset hasn't loaded yet.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FOSCSwitchValuesDeriveFromPins,
+	"OSCToolset.Editor.SwitchValues.DeriveCacheFromPins",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FOSCSwitchValuesDeriveFromPins::RunTest(const FString&)
+{
+	UK2Node_OSCSwitchValues* Node = NewObject<UK2Node_OSCSwitchValues>(GetTransientPackage());
+	Node->Addresses = { SV_Addr(TEXT("KnobA1"), EOSCT_ModuleType::FLOAT),
+	                    SV_Addr(TEXT("Tint"),   EOSCT_ModuleType::COLOR),
+	                    SV_Addr(TEXT("Trig"),   EOSCT_ModuleType::EVENT) };
+	Node->RefreshCachedEntries();   // inline-only -> cache = 3
+	Node->AllocateDefaultPins();    // build pins from cache
+
+	Node->CachedEntries.Reset();    // simulate an empty cache on load (pre-fix / wiped asset)
+	Node->DeriveCachedEntriesFromPins();
+
+	TestEqual(TEXT("derived 3 entries from pins"), Node->CachedEntries.Num(), 3);
+	auto TypeOf = [&](const TCHAR* A, EOSCT_ModuleType& Out) -> bool
+	{
+		for (const FOSCT_NodeAddress& E : Node->CachedEntries) { if (E.Address == A) { Out = E.Type; return true; } }
+		return false;
+	};
+	EOSCT_ModuleType T;
+	TestTrue(TEXT("KnobA1 recovered"), TypeOf(TEXT("KnobA1"), T)); if (TypeOf(TEXT("KnobA1"), T)) TestEqual(TEXT("KnobA1 is FLOAT"), (int32)T, (int32)EOSCT_ModuleType::FLOAT);
+	TestTrue(TEXT("Tint recovered"),   TypeOf(TEXT("Tint"),   T)); if (TypeOf(TEXT("Tint"),   T)) TestEqual(TEXT("Tint is COLOR"),  (int32)T, (int32)EOSCT_ModuleType::COLOR);
+	TestTrue(TEXT("Trig recovered"),   TypeOf(TEXT("Trig"),   T)); if (TypeOf(TEXT("Trig"),   T)) TestEqual(TEXT("Trig is EVENT"),  (int32)T, (int32)EOSCT_ModuleType::EVENT);
+	return true;
+}
+
+// Guard: a not-yet-loaded table (RowStruct still null) must NOT wipe a good snapshot — this is the exact
+// load-order race that dropped the case pins. A genuinely sourceless node, however, does clear.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FOSCSwitchValuesRefreshGuard,
+	"OSCToolset.Editor.SwitchValues.RefreshDoesNotWipeOnUnloadedTable",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FOSCSwitchValuesRefreshGuard::RunTest(const FString&)
+{
+	// Table assigned but unreadable (no RowStruct) == mid-load. Cache must be preserved.
+	UDataTable* Unloaded = NewObject<UDataTable>(GetTransientPackage()); // RowStruct deliberately left null
+	UK2Node_OSCSwitchValues* Node = NewObject<UK2Node_OSCSwitchValues>(GetTransientPackage());
+	Node->AddressTable = Unloaded;
+	Node->CachedEntries = { SV_Addr(TEXT("KnobA1"), EOSCT_ModuleType::FLOAT) }; // pretend deserialized snapshot
+	Node->RefreshCachedEntries();
+	TestEqual(TEXT("cache preserved when table not loaded"), Node->CachedEntries.Num(), 1);
+
+	// No source at all -> cache legitimately clears.
+	UK2Node_OSCSwitchValues* Empty = NewObject<UK2Node_OSCSwitchValues>(GetTransientPackage());
+	Empty->CachedEntries = { SV_Addr(TEXT("Stale"), EOSCT_ModuleType::FLOAT) };
+	Empty->RefreshCachedEntries();
+	TestEqual(TEXT("cache cleared when no source configured"), Empty->CachedEntries.Num(), 0);
+	return true;
+}
+
 // The universal GET_All / GET_All_Tick events exist on the OSCT Router interface.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FOSCRouterGetAllExists,

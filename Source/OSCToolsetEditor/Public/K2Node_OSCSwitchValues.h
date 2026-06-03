@@ -43,12 +43,25 @@ public:
 	UPROPERTY(EditAnywhere, Category="OSC")
 	bool bIncludeDefault;
 
+	/** Serialized snapshot of the resolved address set (inline Addresses + filtered AddressTable rows). This is
+	 *  the source of truth for pin generation, so the case pins (and their wired links) survive reconstruction on
+	 *  load/Play even when the AddressTable asset isn't available at that exact moment (the cause of exec links
+	 *  dropping). Refreshed in PostLoad, on property edits, and when the bound DataTable changes. */
+	UPROPERTY()
+	TArray<FOSCT_NodeAddress> CachedEntries;
+
+	//~ UObject
+	virtual void PostInitProperties() override;
+	virtual void PostLoad() override;
+	virtual void BeginDestroy() override;
+
 	//~ UEdGraphNode
 	virtual void AllocateDefaultPins() override;
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 	virtual FText GetTooltipText() const override;
 	virtual FSlateIcon GetIconAndTint(FLinearColor& OutColor) const override;
 	virtual void ValidateNodeDuringCompilation(class FCompilerResultsLog& MessageLog) const override;
+	virtual void PostPasteNode() override;
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
@@ -59,6 +72,14 @@ public:
 	virtual void ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph) override;
 	virtual bool ShouldShowNodeProperties() const override { return true; }
 	virtual bool IsNodePure() const override { return false; }
+
+	/** Recompute CachedEntries from the inline Addresses + filtered AddressTable rows.
+	 *  Guarded: never wipes a good snapshot just because the AddressTable isn't loaded yet (load-order race). */
+	void RefreshCachedEntries();
+
+	/** Rebuild CachedEntries from the node's own persisted case pins. Timing-independent (pins are serialized
+	 *  with the node), so it recovers the address set even when the AddressTable asset hasn't loaded yet. */
+	void DeriveCachedEntriesFromPins();
 
 private:
 	struct FOSCSwitchEntry
@@ -73,6 +94,14 @@ private:
 	void CollectEntries(TArray<FOSCSwitchEntry>& Out) const;
 	static bool MakePinType(EOSCT_ModuleType Type, FEdGraphPinType& OutType); // false = no value (EVENT)
 	static FName FunctionNameForType(EOSCT_ModuleType Type);                  // NAME_None = no getter
+	static EOSCT_ModuleType ModuleTypeFromPinType(const FEdGraphPinType& PinType); // inverse of MakePinType
+
+	/** Live resolution of the active address set from inline Addresses + filtered AddressTable rows (deduped). */
+	void ResolveEntries(TArray<FOSCT_NodeAddress>& Out) const;
+
+	/** Bind/unbind UDataTable::OnDataTableChanged so case pins refresh when the assigned table's rows change. */
+	void RebindDataTableHandler();
+	void HandleDataTableChanged();
 
 	UEdGraphPin* GetExecPin() const;
 	UEdGraphPin* GetReceiverPin() const;
@@ -80,4 +109,10 @@ private:
 
 	static const FName ReceiverPinName;
 	static const FName DefaultPinName;
+
+	bool bDataTableChangeHandlerBound = false;
+
+	/** Tracks which DataTable we last bound to, so we can unbind on reassignment. */
+	UPROPERTY(Transient)
+	TObjectPtr<UDataTable> BoundDataTable;
 };
